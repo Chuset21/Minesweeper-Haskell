@@ -1,0 +1,6 @@
+.stack-work/
+*~
+.vscode/
+.DS_Store
+*.png
+*.lock
