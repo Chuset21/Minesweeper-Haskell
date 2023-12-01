@@ -64,15 +64,14 @@ getCellAtIndex Board {grid = g} (i, j) = do
 inBounds :: Board -> (Int, Int) -> Bool
 inBounds b (i, j) =
   let h = size b
-  in 0 <= i && 0 <= j && i < h && j < h
+   in 0 <= i && 0 <= j && i < h && j < h
 
 getNeighbours :: Board -> (Int, Int) -> [((Int, Int), Cell)]
 getNeighbours b (i, j) =
-  let neighbourIndices = [(x, y) | x <- [i-1..i+1],
-                                    y <- [j-1..j+1],
-                                    not $ (x == i) && (y == j),
-                                    inBounds b (x, y) ]
-  in map (\i -> (i, getCellAtIndexUnsafe b i)) neighbourIndices
+  let neighbourIndices =
+        [ (x, y) | x <- [i -1 .. i + 1], y <- [j -1 .. j + 1], not $ (x == i) && (y == j), inBounds b (x, y)
+        ]
+   in map (\i -> (i, getCellAtIndexUnsafe b i)) neighbourIndices
 
 getTotalMines :: [Cell] -> Int
 getTotalMines cells = length $ filter hasMine cells
@@ -98,19 +97,28 @@ generateBoard size numBombs = do
           Cell {hasMine = (i * size + j) `elem` randomIndices, status = Unrevealed}
   return $ Board Playing grid numBombs
 
--- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
-revealCell :: Board -> (Int, Int) -> Board
-revealCell b@Board {state = s, grid = g, totalMines = mines} (i, j) =
-  b {grid = newGrid, state = newBoardState}
+updateCellStatus :: CellState -> Board -> (Int, Int) -> Board
+updateCellStatus s b@Board {grid = g} (i, j) =
+  b {grid = newGrid}
   where
     oldRow = g V.! i
     oldCell = oldRow V.! j
-    newCell = oldCell { status = Revealed }
+    newCell = oldCell {status = s}
     newRow = V.update oldRow (V.singleton (j, newCell))
     newGrid = V.update g (V.singleton (i, newRow))
 
+-- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
+revealCell :: Board -> (Int, Int) -> Board
+revealCell b@Board {state = s, totalMines = mines} i =
+  newBoard {state = newBoardState}
+  where
+    newBoard = updateCellStatus Revealed b i
+
     totalNumberOfCells = size b * size b
     newBoardState
-      | hasMine newCell = Lost
+      | hasMine $ getCellAtIndexUnsafe b i = Lost
       | (totalNumberOfCells - mines) <= length (getIf b (\c -> status c == Revealed)) + 1 = Won -- + 1 because this is the old board
       | otherwise = s
+
+flagCell :: Board -> (Int, Int) -> Board
+flagCell = updateCellStatus Flagged
