@@ -25,12 +25,13 @@ type Grid = V.Vector (V.Vector Cell)
 
 data Board = Board
   { state :: !BoardState,
-    grid :: !Grid
+    grid :: !Grid,
+    totalMines :: !Int
   }
 
 prettyPrintBoard :: Board -> String
-prettyPrintBoard (Board _ boardGrid) =
-  unlines $ map (concatMap debugPrintCell) $ V.toList $ fmap V.toList boardGrid
+prettyPrintBoard Board {grid = g} =
+  unlines $ map (concatMap debugPrintCell) $ V.toList $ fmap V.toList g
 
 prettyPrintBoardWithNumbers :: Board -> String
 prettyPrintBoardWithNumbers b =
@@ -86,7 +87,7 @@ generateSeededBoard gen size numBombs =
       grid = V.generate size $ \i ->
         V.generate size $ \j ->
           Cell {hasMine = (i * size + j) `elem` randomIndices, status = Unrevealed}
-   in (Board Playing grid, newGen)
+   in (Board Playing grid numBombs, newGen)
 
 generateBoard :: MonadRandom m => Int -> Int -> m Board
 generateBoard size numBombs = do
@@ -95,4 +96,21 @@ generateBoard size numBombs = do
       grid = V.generate size $ \i ->
         V.generate size $ \j ->
           Cell {hasMine = (i * size + j) `elem` randomIndices, status = Unrevealed}
-  return $ Board Playing grid
+  return $ Board Playing grid numBombs
+
+-- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
+revealCell :: Board -> (Int, Int) -> Board
+revealCell b@Board {state = s, grid = g, totalMines = mines} (i, j) =
+  b {grid = newGrid, state = newBoardState}
+  where
+    oldRow = g V.! i
+    oldCell = oldRow V.! j
+    newCell = oldCell { status = Revealed }
+    newRow = V.update oldRow (V.singleton (j, newCell))
+    newGrid = V.update g (V.singleton (i, newRow))
+
+    totalNumberOfCells = size b * size b
+    newBoardState
+      | hasMine newCell = Lost
+      | (totalNumberOfCells - mines) <= length (getIf b (\c -> status c == Revealed)) + 1 = Won -- + 1 because this is the old board
+      | otherwise = s
