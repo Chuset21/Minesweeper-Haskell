@@ -112,12 +112,20 @@ updateCellStatus getNewState b@Board {grid = g} (i, j) =
 revealCell :: Board -> (Int, Int) -> Board
 revealCell b i = maybe b (\c -> if status c == Unrevealed then revealCellHelper b i else b) (getCellAtIndex b i)
 
+-- This function reveals a cell and if it has no surrounding mines, it reveals all the cells around it, recursively
+revealNecessaryCells :: Board -> (Int, Int) -> Board
+revealNecessaryCells b i =
+  let newBoard = updateCellStatus (const Revealed) b i
+   in if countSurroundingMines b i == 0
+        then foldl' revealNecessaryCells newBoard (map fst $ getNeighbours newBoard i) -- Reveal all cells around it
+        else newBoard
+
 -- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
 revealCellHelper :: Board -> (Int, Int) -> Board
 revealCellHelper b@Board {state = s, totalMines = mines} i =
   newBoard {state = newBoardState}
   where
-    newBoard = updateCellStatus (const Revealed) b i
+    newBoard = revealNecessaryCells b i
 
     totalNumberOfCells = size b * size b
     newBoardState
