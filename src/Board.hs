@@ -11,7 +11,7 @@ module Board
     generateBoard,
     inBounds,
     size,
-    prettyPrintBoardWithNumbers -- TODO remove
+    prettyPrintBoardWithNumbers, -- TODO remove
   )
 where
 
@@ -42,6 +42,7 @@ data Board = Board
     grid :: !Grid,
     totalMines :: !Int
   }
+  deriving (Eq, Show)
 
 data VisualState = Covered | Uncovered | Flagged | Exploded | SurroundingMines !Int deriving (Eq, Show)
 
@@ -49,6 +50,7 @@ data VisualBoard = VisualBoard
   { state :: !BoardState,
     grid :: ![[((Int, Int), VisualState)]]
   }
+  deriving (Eq, Show)
 
 prettyPrintBoard :: Board -> String
 prettyPrintBoard Board {grid = g} =
@@ -161,7 +163,7 @@ revealNecessaryCells :: Board -> (Int, Int) -> Board
 revealNecessaryCells b i =
   let newBoard = updateCellStatus (const Revealed) b i
    in if countSurroundingMines b i == 0
-        then foldl' revealNecessaryCells newBoard (map fst $ getNeighbours newBoard i) -- Reveal all cells around it
+        then foldl' revealNecessaryCells newBoard (map fst $ filter (\(i, c) -> status c /= Revealed) (getNeighbours newBoard i)) -- Reveal all cells around it, make sure to not include revealed cells or infinite recursion... hard to find bug :(
         else newBoard
 
 -- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing

@@ -33,9 +33,7 @@ setup window = do
 
   -- Create a mutable reference to the board
   boardRef <- liftIO $ newIORef =<< generateBoard 10 10
-
   board <- liftIO $ readIORef boardRef
-  let visualBoard = getBoardVisuals board
 
   let updateVisuals board action = do
         element <- getElementById window "board"
@@ -49,22 +47,26 @@ setup window = do
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
         currentBoard <- liftIO $ readIORef boardRef
-        -- Update the board state by revealing the clicked cell
+        -- Update the board state by running the update action
         let updatedBoard = action currentBoard indices
         -- Write the updated state back to the IORef
         liftIO $ writeIORef boardRef updatedBoard
 
         updateVisuals updatedBoard revealAndUpdateBoard -- This is bugged and hangs the program
-  let buttons = mkTable revealAndUpdateBoard $ grid visualBoard
+  let buttons = mkTable revealAndUpdateBoard $ grid $ getBoardVisuals board
+
+  liftIO $ putStrLn $ prettyPrintBoardWithNumbers board
 
   -- Add buttons to the body of the HTML document
   void $ getBody window #+ [buttons]
 
 mkCell actionOnClick (indices, s) = do
-  btn <- UI.td 
-      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")] 
-      #+ [UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")] 
-      # set UI.src (imageURL s)]
+  btn <-
+    UI.td
+      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
+      #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+             # set UI.src (imageURL s)
+         ]
   on UI.click btn $ \_ -> actionOnClick indices revealCell
 
   return btn
@@ -74,7 +76,6 @@ mkRow actionOnClick cols =
     # set style [("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
     #+ map (mkCell actionOnClick) cols
 
-mkTable :: (t -> (Board -> (Int, Int) -> Board) -> UI void) -> [[(t, VisualState)]] -> UI Element
 mkTable actionOnClick rows =
   UI.table
     # set UI.id_ "board"
