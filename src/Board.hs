@@ -4,7 +4,9 @@ module Board (Board (..), BoardState (..), Cell (status), CellState (..), genera
 
 import Control.Monad.Random
 import Data.List
+import Data.Maybe
 import qualified Data.Vector as V
+import Graphics.UI.Threepenny (base)
 import System.Random
 
 data BoardState = Lost | Playing | Won deriving (Eq, Show)
@@ -107,9 +109,12 @@ updateCellStatus getNewState b@Board {grid = g} (i, j) =
     newRow = V.update oldRow (V.singleton (j, newCell))
     newGrid = V.update g (V.singleton (i, newRow))
 
--- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
 revealCell :: Board -> (Int, Int) -> Board
-revealCell b@Board {state = s, totalMines = mines} i =
+revealCell b i = maybe b (\c -> if status c == Unrevealed then revealCellHelper b i else b) (getCellAtIndex b i)
+
+-- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
+revealCellHelper :: Board -> (Int, Int) -> Board
+revealCellHelper b@Board {state = s, totalMines = mines} i =
   newBoard {state = newBoardState}
   where
     newBoard = updateCellStatus (const Revealed) b i
@@ -121,7 +126,10 @@ revealCell b@Board {state = s, totalMines = mines} i =
       | otherwise = s
 
 toggleFlag :: Board -> (Int, Int) -> Board
-toggleFlag =
+toggleFlag b i = if inBounds b i then toggleFlagHelper b i else b
+
+toggleFlagHelper :: Board -> (Int, Int) -> Board
+toggleFlagHelper =
   updateCellStatus
     ( \c -> case status c of
         Unrevealed -> Flagged
