@@ -6,7 +6,6 @@ import Control.Monad.Random
 import Data.List
 import Data.Maybe
 import qualified Data.Vector as V
-import Graphics.UI.Threepenny (base)
 import System.Random
 
 data BoardState = Lost | Playing | Won deriving (Eq, Show)
@@ -17,10 +16,10 @@ data Cell = Cell
   }
   deriving (Eq, Show)
 
-data CellState = Flagged | Unrevealed | Revealed deriving (Eq, Show)
+data CellState = Flagged_ | Unrevealed | Revealed deriving (Eq, Show)
 
 debugPrintCell :: Cell -> String
-debugPrintCell Cell {status = Flagged} = "[F]"
+debugPrintCell Cell {status = Flagged_} = "[F]"
 debugPrintCell Cell {hasMine = m} = if m then "[M]" else "[ ]"
 
 type Grid = V.Vector (V.Vector Cell)
@@ -31,6 +30,12 @@ data Board = Board
     totalMines :: !Int
   }
 
+data VisualState = Covered | Uncovered | Flagged | Exploded | Num !Int deriving (Eq, Show)
+data VisualBoard = VisualBoard
+  { state :: !BoardState,
+    grid :: ![[((Int, Int), VisualState)]]
+  }
+
 prettyPrintBoard :: Board -> String
 prettyPrintBoard Board {grid = g} =
   unlines $ map (concatMap debugPrintCell) $ V.toList $ fmap V.toList g
@@ -38,6 +43,31 @@ prettyPrintBoard Board {grid = g} =
 prettyPrintBoardWithNumbers :: Board -> String
 prettyPrintBoardWithNumbers b =
   unlines $ map (concatMap (\(i, c) -> if hasMine c then "[*]" else "[" ++ show (countSurroundingMines b i) ++ "]")) (getIndexedMatrix b)
+
+getBoardVisuals :: Board -> VisualBoard
+getBoardVisuals b@Board {state = s} =
+  VisualBoard {state = s, grid = map (map (\c@(i, _) -> (i, cellToVisualState b c))) (getIndexedMatrix b)}
+
+cellToVisualState :: Board -> ((Int, Int), Cell) -> VisualState
+cellToVisualState b@Board {state = s} (indices, cell) =
+  case (s, status cell) of
+    (Playing, Unrevealed) -> Covered
+    (Playing, Revealed) -> getRevealedValue
+    (Playing, Flagged_) -> Flagged
+    (Won, st) -> case st of
+      Revealed -> getRevealedValue
+      _ -> Flagged
+    (Lost, st) ->
+      if hasMine cell
+        then Exploded
+        else case st of
+          Revealed -> getRevealedValue
+          Unrevealed -> Covered
+          Flagged_ -> Flagged
+  where
+    getRevealedValue =
+      let n = countSurroundingMines b indices
+       in if n > 0 then Num n else Uncovered
 
 -- Length and width will be equal
 size :: Board -> Int
@@ -140,7 +170,7 @@ toggleFlagHelper :: Board -> (Int, Int) -> Board
 toggleFlagHelper =
   updateCellStatus
     ( \c -> case status c of
-        Unrevealed -> Flagged
-        Flagged -> Unrevealed
+        Unrevealed -> Flagged_
+        Flagged_ -> Unrevealed
         _ -> status c
     )
