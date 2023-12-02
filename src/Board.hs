@@ -1,7 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Board
-  ( VisualBoard (..),
+  ( Board,
+    VisualBoard (..),
     VisualState (..),
     toggleFlag,
     revealCell,
@@ -42,7 +43,7 @@ data Board = Board
     totalMines :: !Int
   }
 
-data VisualState = Covered | Uncovered | Flagged | Exploded | Num !Int deriving (Eq, Show)
+data VisualState = Covered | Uncovered | Flagged | Exploded | SurroundingMines !Int deriving (Eq, Show)
 
 data VisualBoard = VisualBoard
   { state :: !BoardState,
@@ -80,7 +81,7 @@ cellToVisualState b@Board {state = s} (indices, cell) =
   where
     getRevealedValue =
       let n = countSurroundingMines b indices
-       in if n > 0 then Num n else Uncovered
+       in if n > 0 then SurroundingMines n else Uncovered
 
 -- Length and width will be equal
 size :: Board -> Int
