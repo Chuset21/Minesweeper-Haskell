@@ -30,6 +30,7 @@ imageFileName Exploded = "exploded.png"
 setup :: Window -> UI ()
 setup window = do
   return window # set title "Minesweeper"
+  runFunction $ ffi "document.addEventListener('contextmenu', function(event) {event.preventDefault();});" -- Disable the context menu popup on right clicks
 
   -- Create a mutable reference to the board
   boardRef <- liftIO $ newIORef =<< generateBoard 10 10
@@ -68,6 +69,7 @@ mkCell actionOnClick (indices, s) = do
              # set UI.src (imageURL s)
          ]
   on UI.click btn $ \_ -> actionOnClick indices revealCell
+  on UI.contextmenu btn $ \_ -> actionOnClick indices toggleFlag
 
   return btn
 
