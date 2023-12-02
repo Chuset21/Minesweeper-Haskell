@@ -97,13 +97,13 @@ generateBoard size numBombs = do
           Cell {hasMine = (i * size + j) `elem` randomIndices, status = Unrevealed}
   return $ Board Playing grid numBombs
 
-updateCellStatus :: CellState -> Board -> (Int, Int) -> Board
-updateCellStatus s b@Board {grid = g} (i, j) =
+updateCellStatus :: (Cell -> CellState) -> Board -> (Int, Int) -> Board
+updateCellStatus getNewState b@Board {grid = g} (i, j) =
   b {grid = newGrid}
   where
     oldRow = g V.! i
     oldCell = oldRow V.! j
-    newCell = oldCell {status = s}
+    newCell = oldCell {status = getNewState oldCell}
     newRow = V.update oldRow (V.singleton (j, newCell))
     newGrid = V.update g (V.singleton (i, newRow))
 
@@ -112,7 +112,7 @@ revealCell :: Board -> (Int, Int) -> Board
 revealCell b@Board {state = s, totalMines = mines} i =
   newBoard {state = newBoardState}
   where
-    newBoard = updateCellStatus Revealed b i
+    newBoard = updateCellStatus (const Revealed) b i
 
     totalNumberOfCells = size b * size b
     newBoardState
@@ -120,5 +120,11 @@ revealCell b@Board {state = s, totalMines = mines} i =
       | (totalNumberOfCells - mines) <= length (getIf b (\c -> status c == Revealed)) + 1 = Won -- + 1 because this is the old board
       | otherwise = s
 
-flagCell :: Board -> (Int, Int) -> Board
-flagCell = updateCellStatus Flagged
+toggleFlag :: Board -> (Int, Int) -> Board
+toggleFlag =
+  updateCellStatus
+    ( \c -> case status c of
+        Unrevealed -> Flagged
+        Flagged -> Unrevealed
+        _ -> status c
+    )
