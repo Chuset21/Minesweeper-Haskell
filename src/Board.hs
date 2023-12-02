@@ -1,6 +1,18 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
-module Board (Board (..), BoardState (..), Cell (status), CellState (..), generateSeededBoard, generateBoard, prettyPrintBoard, prettyPrintBoardWithNumbers, getIf) where
+module Board
+  ( VisualBoard (..),
+    VisualState (..),
+    toggleFlag,
+    revealCell,
+    getBoardVisuals,
+    generateSeededBoard,
+    generateBoard,
+    inBounds,
+    size,
+    prettyPrintBoardWithNumbers -- TODO remove
+  )
+where
 
 import Control.Monad.Random
 import Data.List
@@ -31,6 +43,7 @@ data Board = Board
   }
 
 data VisualState = Covered | Uncovered | Flagged | Exploded | Num !Int deriving (Eq, Show)
+
 data VisualBoard = VisualBoard
   { state :: !BoardState,
     grid :: ![[((Int, Int), VisualState)]]
