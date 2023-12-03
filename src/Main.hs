@@ -37,7 +37,7 @@ imageFileName Exploded = "exploded.png"
 
 main :: IO ()
 main = do
-  startGUI defaultConfig {jsStatic = Just path} setup
+  startGUI defaultConfig {jsStatic = Just $ path ++ "/."} setup
 
 mainPageButtonStyles =
   [ ("width", "260"),
@@ -51,6 +51,7 @@ deleteAll window = getBody window # set children []
 
 setup :: Window -> UI ()
 setup window = do
+  getBody window # set style [("background-image", "url('https://www.newegg.com/insider/wp-content/uploads/2014/04/windows_xp_bliss-wide.jpg')")] -- Windows background
   return window # set title "Minesweeper"
 
   pageTitle <- UI.h1 # set text "Minesweeper" # set style [("text-align", "center"), ("font-size", "6em")]
