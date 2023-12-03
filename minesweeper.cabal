@@ -15,7 +15,7 @@ extra-source-files:  README.md
 executable minesweeper
   hs-source-dirs:      src
   main-is:             Main.hs
-  other-modules:       Board
+  other-modules:       Board, Agent
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
                      , mtl

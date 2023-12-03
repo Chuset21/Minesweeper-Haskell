@@ -3,6 +3,7 @@
 
 module Main where
 
+import Agent (Move (..), makeMove, uncoverRandom)
 import Board
   ( Board (state),
     BoardState (..),
@@ -10,8 +11,9 @@ import Board
     VisualState (..),
     generateBoard,
     getBoardVisuals,
+    prettyPrintBoardWithNumbers,
     revealCell,
-    toggleFlag, prettyPrintBoardWithNumbers,
+    toggleFlag,
   )
 import Control.Monad
 import Data.Bits
@@ -175,7 +177,16 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "play.png")
                ]
-        on UI.click btn $ \_ -> liftIO $ print "Auto move button clicked!!!" -- TODO
+        on UI.click btn $ \_ -> do
+          currentBoard <- liftIO $ readIORef boardRef
+          when (state currentBoard == Playing) $ do
+            let visualB = getBoardVisuals currentBoard
+             in case makeMove $ getBoardVisuals currentBoard of
+                  Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
+                  Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
+                  Nothing -> do
+                    x <- liftIO $ uncoverRandom visualB
+                    revealAndUpdateBoard x revealCell
         return btn
 
   void $

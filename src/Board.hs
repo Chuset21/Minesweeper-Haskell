@@ -5,13 +5,12 @@ module Board
     BoardState (..),
     VisualBoard (..),
     VisualState (..),
+    Boarded (size, inBounds),
     toggleFlag,
     revealCell,
     getBoardVisuals,
     generateSeededBoard,
     generateBoard,
-    inBounds,
-    size,
     prettyPrintBoardWithNumbers, -- TODO remove
   )
 where
@@ -34,6 +33,10 @@ data CellState = Flagged_ | Unrevealed | Revealed deriving (Eq, Show)
 
 type Grid = V.Vector (V.Vector Cell)
 
+class Boarded b where
+  size :: b -> Int
+  inBounds :: b -> (Int, Int) -> Bool
+
 data Board = Board
   { state :: !BoardState,
     grid :: !Grid,
@@ -45,17 +48,34 @@ data VisualState = Covered | Uncovered | Flagged | Exploded | SurroundingMines !
 
 data VisualBoard = VisualBoard
   { state :: !BoardState,
-    grid :: ![[((Int, Int), VisualState)]]
+    grid :: ![[((Int, Int), VisualState)]],
+    totalMines :: !Int
   }
   deriving (Eq, Show)
+
+instance Boarded Board where
+  -- Length and width will be equal
+  size Board {grid = g} = V.length g
+
+  inBounds b (i, j) =
+    let h = size b
+     in 0 <= i && 0 <= j && i < h && j < h
+
+instance Boarded VisualBoard where
+  -- Length and width will be equal
+  size VisualBoard {grid = g} = length g
+
+  inBounds b (i, j) =
+    let h = size b
+     in 0 <= i && 0 <= j && i < h && j < h
 
 prettyPrintBoardWithNumbers :: Board -> String
 prettyPrintBoardWithNumbers b =
   unlines $ map (concatMap (\(i, c) -> if hasMine c then "[*]" else "[" ++ show (countSurroundingMines b i) ++ "]")) (getIndexedMatrix b)
 
 getBoardVisuals :: Board -> VisualBoard
-getBoardVisuals b@Board {state = s} =
-  VisualBoard {state = s, grid = map (map (\c@(i, _) -> (i, cellToVisualState b c))) (getIndexedMatrix b)}
+getBoardVisuals b@Board {state = s, totalMines = m} =
+  VisualBoard {state = s, grid = map (map (\c@(i, _) -> (i, cellToVisualState b c))) (getIndexedMatrix b), totalMines = m}
 
 cellToVisualState :: Board -> ((Int, Int), Cell) -> VisualState
 cellToVisualState b@Board {state = s} (indices, cell) =
@@ -78,10 +98,6 @@ cellToVisualState b@Board {state = s} (indices, cell) =
       let n = countSurroundingMines b indices
        in if n > 0 then SurroundingMines n else Uncovered
 
--- Length and width will be equal
-size :: Board -> Int
-size Board {grid = g} = V.length g
-
 getIf :: Board -> (Cell -> Bool) -> [((Int, Int), Cell)]
 getIf Board {grid = g} predicate =
   [((i, j), cell) | (i, row) <- V.toList $ V.indexed g, (j, cell) <- V.toList $ V.indexed row, predicate cell]
@@ -101,11 +117,6 @@ getCellAtIndex :: Board -> (Int, Int) -> Maybe Cell
 getCellAtIndex Board {grid = g} (i, j) = do
   row <- g V.!? i
   row V.!? j
-
-inBounds :: Board -> (Int, Int) -> Bool
-inBounds b (i, j) =
-  let h = size b
-   in 0 <= i && 0 <= j && i < h && j < h
 
 getNeighbours :: Board -> (Int, Int) -> [((Int, Int), Cell)]
 getNeighbours b (i, j) =
