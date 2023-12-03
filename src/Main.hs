@@ -24,10 +24,6 @@ data Mode = Flagging | Mining deriving (Eq, Show)
 
 path = "static"
 
-main :: IO ()
-main = do
-  startGUI defaultConfig {jsStatic = Just path} $ playMinesweeper 10 10
-
 imageURL :: VisualState -> String
 imageURL s = path ++ "/" ++ imageFileName s
 
@@ -39,9 +35,54 @@ imageFileName (SurroundingMines n) = "number" ++ show n ++ ".png"
 imageFileName Flagged = "flag.png"
 imageFileName Exploded = "exploded.png"
 
+main :: IO ()
+main = do
+  startGUI defaultConfig {jsStatic = Just path} setup
+
+mainPageButtonStyles =
+  [ ("width", "260"),
+    ("border", "solid black 2px"),
+    ("font-size", "4em"),
+    ("background", "grey"),
+    ("border-radius", "5px")
+  ]
+
+deleteAll window = getBody window # set children []
+
+setup :: Window -> UI ()
+setup window = do
+  return window # set title "Minesweeper"
+
+  pageTitle <- UI.h1 # set text "Minesweeper" # set style [("text-align", "center"), ("font-size", "6em")]
+  easyBtn <- UI.button #+ [string "Easy"] # set style (("margin-bottom", "40px") : mainPageButtonStyles)
+  mediumBtn <- UI.button #+ [string "Medium"] # set style (("margin-bottom", "40px") : mainPageButtonStyles)
+  hardBtn <- UI.button #+ [string "Hard"] # set style mainPageButtonStyles
+
+  getBody window
+    #+ [ element pageTitle,
+         UI.div
+           # set style [("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
+           #+ [ UI.div
+                  # set style [("display", "flex"), ("flexDirection", "column"), ("justifyContent", "space-around")]
+                  #+ [element easyBtn, element mediumBtn, element hardBtn] -- Evenly space buttons in this div
+              ]
+       ]
+
+  on UI.click easyBtn $ \_ -> do
+    deleteAll window
+    playMinesweeper 10 10 window
+
+  on UI.click mediumBtn $ \_ -> do
+    deleteAll window
+    playMinesweeper 18 40 window
+
+  on UI.click hardBtn $ \_ -> do
+    deleteAll window
+    playMinesweeper 24 99 window
+      
+
 playMinesweeper :: Int -> Int -> Window -> UI ()
 playMinesweeper size numOfMines window = do
-  return window # set title "Minesweeper"
   runFunction $ ffi "document.addEventListener('contextmenu', function(event) {event.preventDefault();});" -- Disable the context menu popup on right clicks
 
   -- Create a mutable reference to the board
@@ -114,7 +155,7 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "refresh.png")
                ]
-        on UI.click btn $ \_ -> getBody window # set children [] >> setup window
+        on UI.click btn $ \_ -> getBody window # set children [] >> playMinesweeper size numOfMines window
 
         return btn
 
@@ -125,7 +166,9 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "home-button.png")
                ]
-        on UI.click btn $ \_ -> liftIO $ print "Home button clicked!!!" -- TODO
+        on UI.click btn $ \_ -> do
+          deleteAll window
+          setup window
 
         return btn
 
@@ -137,7 +180,6 @@ playMinesweeper size numOfMines window = do
                    # set UI.src (path ++ "/" ++ "play.png")
                ]
         on UI.click btn $ \_ -> liftIO $ print "Auto move button clicked!!!" -- TODO
-
         return btn
 
   void $
