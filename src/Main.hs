@@ -155,12 +155,12 @@ playMinesweeper size numOfMines window = do
           Nothing -> pure ()
           Just x -> do
             newBoardElement <- mkTable action modeRef $ grid $ getBoardVisuals board
-            case state board of
+            pure x # set children [newBoardElement] -- Set new board
+            -- Detect winning or losing condition and show appropriate text
+            case state board of  
               Won -> void $ setTextAndStyles "You Win!!" $ ("color", "rgba(0, 255, 0, 0.8)") : darkSoulsDeathStyle
               Lost -> void $ setTextAndStyles "You Lose" $ ("color", "rgba(255, 0, 0, 0.8)") : darkSoulsDeathStyle
               Playing -> pure ()
-
-            void $ pure x # set children [newBoardElement] -- Set new board
 
   -- This function handles revealing and updating the board visuals
   -- TODO: fix bug where sometimes you are sent back to the main screen (setup function) when you didn't click home, or the whole board disappears...
