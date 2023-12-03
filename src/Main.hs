@@ -11,7 +11,7 @@ import Board
     generateBoard,
     getBoardVisuals,
     revealCell,
-    toggleFlag,
+    toggleFlag, prettyPrintBoardWithNumbers,
   )
 import Control.Monad
 import Data.Bits
@@ -153,7 +153,7 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "refresh.png")
                ]
-        on UI.click btn $ \_ -> getBody window # set children [] >> playMinesweeper size numOfMines window
+        on UI.click btn $ \_ -> deleteAll window >> playMinesweeper size numOfMines window
 
         return btn
 
@@ -164,9 +164,7 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "home-button.png")
                ]
-        on UI.click btn $ \_ -> do
-          deleteAll window
-          setup window
+        on UI.click btn $ \_ -> deleteAll window >> setup window
 
         return btn
 
