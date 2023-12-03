@@ -79,6 +79,7 @@ deleteAll window = getBody window # set children []
 -- Landing page to select your difficulty
 setup :: Window -> UI ()
 setup window = do
+  deleteAll window 
   getBody window # set style [("background-image", "url('https://www.newegg.com/insider/wp-content/uploads/2014/04/windows_xp_bliss-wide.jpg')")] -- Windows background
   return window # set title "Minesweeper"
 
@@ -99,20 +100,18 @@ setup window = do
 
   -- I went off of the difficulties seen online, the google game that shows up when you search for minesweeper
   on UI.click easyBtn $ \_ -> do
-    deleteAll window
     playMinesweeper 10 10 window
 
   on UI.click mediumBtn $ \_ -> do
-    deleteAll window
     playMinesweeper 18 40 window
 
   on UI.click hardBtn $ \_ -> do
-    deleteAll window
     playMinesweeper 24 99 window
 
 -- Play the actual minesweeper game
 playMinesweeper :: Int -> Int -> Window -> UI ()
 playMinesweeper size numOfMines window = do
+  deleteAll window 
   runFunction $ ffi "document.addEventListener('contextmenu', function(event) {event.preventDefault();});" -- Disable the context menu popup on right clicks
 
   -- Create a mutable reference to the board
@@ -183,7 +182,7 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "refresh.png")
                ]
-        on UI.click btn $ \_ -> deleteAll window >> playMinesweeper size numOfMines window
+        on UI.click btn $ \_ -> playMinesweeper size numOfMines window
 
         return btn
 
@@ -195,7 +194,7 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "home-button.png")
                ]
-        on UI.click btn $ \_ -> deleteAll window >> setup window
+        on UI.click btn $ \_ -> setup window
 
         return btn
 
