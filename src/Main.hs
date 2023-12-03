@@ -108,8 +108,8 @@ playMinesweeper size numOfMines window = do
             #+ buildImage mode
         on UI.click btn $ \_ -> do
           liftIO $ modifyIORef modeRef (\s -> if s == Flagging then Mining else Flagging)
-          mode <- liftIO $ readIORef modeRef
-          elements <- liftIO $ mapM (runUI window) (buildImage mode)
+          mode' <- liftIO $ readIORef modeRef
+          elements <- liftIO $ mapM (runUI window) (buildImage mode')
           element btn # set children elements
         return btn
         where
