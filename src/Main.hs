@@ -102,24 +102,22 @@ playMinesweeper size numOfMines window = do
 
   let modeButton = do
         mode <- liftIO $ readIORef modeRef
-        let image m =
-              [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
-                  # set UI.src (getImage m)
-              ]
         btn <-
           UI.button
             # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
-            #+ image mode
+            #+ buildImage mode
         on UI.click btn $ \_ -> do
           liftIO $ modifyIORef modeRef (\s -> if s == Flagging then Mining else Flagging)
           mode <- liftIO $ readIORef modeRef
-          element btn # set children []
-          element btn #+ image mode
+          elements <- liftIO $ mapM (runUI window) (buildImage mode)
+          element btn # set children elements
         return btn
         where
-          getImage m = path ++ "/" ++ name
-            where
-              name = (if m == Mining then "pickaxe" else "flag") ++ ".png"
+          buildImage m =
+            [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+                # set UI.src (getImage m)
+            ]
+          getImage m = path ++ "/" ++ ((if m == Mining then "pickaxe" else "flag") ++ ".png")
 
   -- This function handles updating the board visuals
   let updateVisuals board action = do
@@ -134,7 +132,7 @@ playMinesweeper size numOfMines window = do
               Playing -> pure ()
 
             void $ pure x # set children [buttons] -- Set new board
-  
+
   -- This function handles revealing and updating the board visuals
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
