@@ -126,8 +126,8 @@ playMinesweeper size numOfMines window = do
           Just x -> do
             buttons <- mkTable action modeRef $ grid $ getBoardVisuals board
             case state board of
-              Won -> void $ setTextAndStyles "You Win!!" $ ("color", "green") : darkSoulsDeathStyle
-              Lost -> void $ setTextAndStyles "You Lose" $ ("color", "red") : darkSoulsDeathStyle
+              Won -> void $ setTextAndStyles "You Win!!" $ ("color", "rgba(0, 255, 0, 0.8)") : darkSoulsDeathStyle
+              Lost -> void $ setTextAndStyles "You Lose" $ ("color", "rgba(255, 0, 0, 0.8)") : darkSoulsDeathStyle
               Playing -> pure ()
 
             void $ pure x # set children [buttons] -- Set new board
@@ -194,7 +194,7 @@ playMinesweeper size numOfMines window = do
          ]
 
 darkSoulsDeathStyle =
-  [ ("background-color", "#222"),
+  [ ("background-color", "rgba(34, 34, 34, 0.8)"),
     ("font-size", "3em"),
     ("text-align", "center"),
     ("width", "100%"),
