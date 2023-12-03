@@ -35,9 +35,9 @@ uncoverRandom :: MonadRandom m => VisualBoard -> m (Int, Int)
 uncoverRandom b@VisualBoard {state = s, grid = g} =
   if null coveredIndices
     then pure (0, 0) -- This should never happen, since this shouldn't be called when the game state isn't 'Playing' or if all the remaining cells are flagged (some must be flagged wrong, but the AI did not do this)
-    else do 
-        i <- getRandomR (0, length coveredIndices - 1)
-        pure (coveredIndices !! i)
+    else do
+      i <- getRandomR (0, length coveredIndices - 1)
+      pure (coveredIndices !! i)
   where
     coveredIndices = map fst $ getIf g (\(_, vs) -> vs == Covered)
     maxIndex = length coveredIndices - 1
