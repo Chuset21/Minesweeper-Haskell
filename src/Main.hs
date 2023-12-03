@@ -80,7 +80,6 @@ setup window = do
   on UI.click hardBtn $ \_ -> do
     deleteAll window
     playMinesweeper 24 99 window
-      
 
 playMinesweeper :: Int -> Int -> Window -> UI ()
 playMinesweeper size numOfMines window = do
@@ -132,7 +131,6 @@ playMinesweeper size numOfMines window = do
               Playing -> pure ()
 
             void $ pure x # set children [buttons] -- Set new board
-
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
         currentBoard <- liftIO $ readIORef boardRef
