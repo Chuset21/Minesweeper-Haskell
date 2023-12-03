@@ -11,7 +11,6 @@ import Board
     VisualState (..),
     generateBoard,
     getBoardVisuals,
-    prettyPrintBoardWithNumbers,
     revealCell,
     toggleFlag,
   )

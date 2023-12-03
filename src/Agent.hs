@@ -2,9 +2,9 @@ module Agent (Move (..), makeMove, uncoverRandom) where
 
 import Board
   ( BoardState (..),
-    Boarded (..),
     VisualBoard (..),
     VisualState (..),
+    inBounds
   )
 import Control.Monad.Random (MonadRandom (getRandomR))
 import Data.List (find)
