@@ -4,7 +4,7 @@ import Board
   ( BoardState (..),
     VisualBoard (..),
     VisualState (..),
-    inBounds
+    inBounds,
   )
 import Control.Monad.Random (MonadRandom (getRandomR))
 import Data.List (find)

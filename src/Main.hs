@@ -14,12 +14,33 @@ import Board
     revealCell,
     toggleFlag,
   )
-import Control.Monad
-import Data.Bits
-import Data.IORef (IORef, modifyIORef, newIORef, readIORef, writeIORef)
+import Control.Monad (void, when)
+import Data.IORef (modifyIORef, newIORef, readIORef, writeIORef)
 import qualified Graphics.UI.Threepenny as UI
-import Graphics.UI.Threepenny.Core hiding (grid)
-import System.Random (RandomGen, newStdGen)
+import Graphics.UI.Threepenny.Core
+  ( Config (jsStatic),
+    MonadIO (liftIO),
+    UI,
+    Window,
+    children,
+    defaultConfig,
+    element,
+    ffi,
+    getBody,
+    getElementById,
+    on,
+    runFunction,
+    runUI,
+    set,
+    startGUI,
+    string,
+    style,
+    text,
+    title,
+    (#),
+    (#+),
+  )
+import System.Random (RandomGen)
 
 data Mode = Flagging | Mining deriving (Eq, Show)
 
