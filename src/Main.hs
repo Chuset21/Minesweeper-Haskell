@@ -154,16 +154,16 @@ playMinesweeper size numOfMines window = do
         case element of
           Nothing -> pure ()
           Just x -> do
-            newBoardElement <- mkTable action modeRef $ grid $ getBoardVisuals board
-            pure x # set children [newBoardElement] -- Set new board
+            newBoardElement <- liftIO $ mapM (runUI window . mkRow action modeRef) (grid $ getBoardVisuals board)
+            pure x # set children newBoardElement -- Set new board
             -- Detect winning or losing condition and show appropriate text
-            case state board of  
+            case state board of
               Won -> void $ setTextAndStyles "You Win!!" $ ("color", "rgba(0, 255, 0, 0.8)") : darkSoulsDeathStyle
               Lost -> void $ setTextAndStyles "You Lose" $ ("color", "rgba(255, 0, 0, 0.8)") : darkSoulsDeathStyle
               Playing -> pure ()
 
   -- This function handles revealing and updating the board visuals
-  -- TODO: fix bug where sometimes you are sent back to the main screen (setup function) when you didn't click home, or the whole board disappears...
+  -- TODO: fix bug where sometimes you are sent back to the main screen (setup function) when you didn't click home
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
         currentBoard <- liftIO $ readIORef boardRef
@@ -210,13 +210,12 @@ playMinesweeper size numOfMines window = do
         on UI.click btn $ \_ -> do
           currentBoard <- liftIO $ readIORef boardRef
           when (state currentBoard == Playing) $ do
-            let visualB = getBoardVisuals currentBoard
-             in case makeMove $ getBoardVisuals currentBoard of
-                  Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
-                  Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
-                  Nothing -> do
-                    x <- liftIO $ uncoverRandom visualB
-                    revealAndUpdateBoard x revealCell
+            case makeMove $ getBoardVisuals currentBoard of
+              Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
+              Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
+              Nothing -> do
+                x <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
+                revealAndUpdateBoard x revealCell
         return btn
 
   -- Element representing the minesweeper board, as a table of buttons
