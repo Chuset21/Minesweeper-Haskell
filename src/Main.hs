@@ -125,14 +125,13 @@ playMinesweeper size numOfMines window = do
         case element of
           Nothing -> pure ()
           Just x -> do
-            pure x # set children [] -- Clear existing children
-            let buttons = mkTable action modeRef $ grid $ getBoardVisuals board
+            buttons <- mkTable action modeRef $ grid $ getBoardVisuals board
             case state board of
               Won -> void $ setTextAndStyles "You Win!!" $ ("color", "green") : darkSoulsDeathStyle
               Lost -> void $ setTextAndStyles "You Lose" $ ("color", "red") : darkSoulsDeathStyle
               Playing -> pure ()
 
-            void $ pure x #+ [buttons]
+            void $ pure x # set children [buttons] -- Set new board
 
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
