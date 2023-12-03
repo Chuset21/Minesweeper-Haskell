@@ -1,7 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Board
-  ( Board,
+  ( Board (state),
+    BoardState (..),
     VisualBoard (..),
     VisualState (..),
     toggleFlag,

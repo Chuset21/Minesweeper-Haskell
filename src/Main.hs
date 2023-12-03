@@ -4,6 +4,15 @@
 module Main where
 
 import Board
+  ( Board (state),
+    BoardState (Lost, Playing, Won),
+    VisualBoard (grid),
+    VisualState (..),
+    generateBoard,
+    getBoardVisuals,
+    revealCell,
+    toggleFlag,
+  )
 import Control.Monad
 import Data.Bits
 import Data.IORef (IORef, modifyIORef, newIORef, readIORef, writeIORef)
@@ -40,6 +49,14 @@ setup window = do
   board <- liftIO $ readIORef boardRef
 
   modeRef <- liftIO $ newIORef Mining
+
+  endText <- UI.div
+
+  let setTextAndStyles s styles =
+        element endText
+          # set style styles
+          # set UI.text s
+
   let modeButton = do
         mode <- liftIO $ readIORef modeRef
         btn <-
@@ -59,17 +76,25 @@ setup window = do
           Just x -> do
             pure x # set children [] -- Clear existing children
             let buttons = mkTable action modeRef $ grid $ getBoardVisuals board
+            case state board of
+              Won -> void $ setTextAndStyles "You Win!!" $ ("color", "green") : darkSoulsDeathStyle
+              Lost -> void $ setTextAndStyles "You Lose" $ ("color", "red") : darkSoulsDeathStyle
+              Playing -> pure ()
+
             void $ pure x #+ [buttons]
 
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
         currentBoard <- liftIO $ readIORef boardRef
         -- Update the board state by running the update action
-        let updatedBoard = action currentBoard indices
-        -- Write the updated state back to the IORef
-        liftIO $ writeIORef boardRef updatedBoard
+        if state currentBoard == Playing
+          then do
+            let updatedBoard = action currentBoard indices
+            -- Write the updated state back to the IORef
+            liftIO $ writeIORef boardRef updatedBoard
 
-        updateVisuals updatedBoard revealAndUpdateBoard
+            updateVisuals updatedBoard revealAndUpdateBoard
+          else pure ()
 
   let buttons = mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
 
@@ -84,13 +109,32 @@ setup window = do
 
         return btn
 
-  -- Add buttons to the body of the HTML document
-  void $ getBody window #+ [refreshButton, modeButton, buttons]
+  void $
+    getBody window
+      #+ [ UI.div
+             # set style [("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
+             #+ [ UI.div #+ [refreshButton, modeButton],
+                  UI.div
+                    # set style [("width", "600px"), ("height", "600px")]
+                    #+ [buttons, element endText]
+                ]
+         ]
+
+darkSoulsDeathStyle =
+  [ ("background-color", "#222"),
+    ("font-size", "3em"),
+    ("text-align", "center"),
+    ("width", "100%"),
+    ("position", "fixed"),
+    ("top", "50%"),
+    ("left", "50%"),
+    ("transform", "translate(-50%, -50%)")
+  ]
 
 mkCell actionOnClick modeRef (indices, s) = do
   btn <-
     UI.td
-      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
+      # set style [("width", "auto"), ("height", "auto"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
       #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
              # set UI.src (imageURL s)
          ]
@@ -107,11 +151,11 @@ mkCell actionOnClick modeRef (indices, s) = do
 
 mkRow actionOnClick modeRef cols =
   UI.tr
-    # set style [("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
+    # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
     #+ map (mkCell actionOnClick modeRef) cols
 
 mkTable actionOnClick modeRef rows =
   UI.table
     # set UI.id_ "board"
-    # set style [("border-spacing", "0px"), ("border-collapse", "collapse"), ("cellspacing", "0px"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
+    # set style [("width", "100%"), ("height", "100%"), ("border-spacing", "0px"), ("border-collapse", "collapse"), ("cellspacing", "0px"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
     #+ map (mkRow actionOnClick modeRef) rows
