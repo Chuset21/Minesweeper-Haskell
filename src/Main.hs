@@ -137,14 +137,12 @@ playMinesweeper size numOfMines window = do
       revealAndUpdateBoard indices action = do
         currentBoard <- liftIO $ readIORef boardRef
         -- Update the board state by running the update action
-        if state currentBoard == Playing
-          then do
-            let updatedBoard = action currentBoard indices
-            -- Write the updated state back to the IORef
-            liftIO $ writeIORef boardRef updatedBoard
+        when (state currentBoard == Playing) $ do
+          let updatedBoard = action currentBoard indices
+          -- Write the updated state back to the IORef
+          liftIO $ writeIORef boardRef updatedBoard
 
-            updateVisuals updatedBoard revealAndUpdateBoard
-          else pure ()
+          updateVisuals updatedBoard revealAndUpdateBoard
 
   let buttons = mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
 
