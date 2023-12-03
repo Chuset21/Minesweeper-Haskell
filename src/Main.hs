@@ -129,13 +129,24 @@ setup window = do
 
         return btn
 
+  let autoMoveButton = do
+        btn <-
+          UI.button
+            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+            #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+                   # set UI.src (path ++ "/" ++ "play.png")
+               ]
+        on UI.click btn $ \_ -> liftIO $ print "Auto move button clicked!!!" -- TODO
+
+        return btn
+
   void $
     getBody window
       #+ [ UI.div
              # set style [("width", "600px"), ("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
              #+ [ UI.div
                     # set style [("display", "flex"), ("flexDirection", "row"), ("justifyContent", "space-around")]
-                    #+ [homeButton, refreshButton, modeButton], -- Evenly space buttons in this div
+                    #+ [homeButton, refreshButton, modeButton, autoMoveButton], -- Evenly space buttons in this div
                   UI.div
                     # set style [("width", "100%"), ("height", "600px")]
                     #+ [buttons, element endText]
