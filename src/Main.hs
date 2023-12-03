@@ -5,11 +5,11 @@ module Main where
 
 import Board
 import Control.Monad
+import Data.Bits
 import Data.IORef (IORef, modifyIORef, newIORef, readIORef, writeIORef)
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core hiding (grid)
 import System.Random (RandomGen, newStdGen)
-import Data.Bits
 
 data Mode = Flagging | Mining deriving (Eq, Show)
 
@@ -49,7 +49,8 @@ setup window = do
           mode <- liftIO $ readIORef modeRef
           element btn # set text (btnText mode)
         return btn
-        where btnText m = "Current mode: " ++ show m
+        where
+          btnText m = "Current mode: " ++ show m
 
   let updateVisuals board action = do
         element <- getElementById window "board"
@@ -68,18 +69,20 @@ setup window = do
         -- Write the updated state back to the IORef
         liftIO $ writeIORef boardRef updatedBoard
 
-        updateVisuals updatedBoard revealAndUpdateBoard -- This is bugged and hangs the program
+        updateVisuals updatedBoard revealAndUpdateBoard
+
   let buttons = mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
 
   let refreshButton = do
-          btn <- UI.button 
+        btn <-
+          UI.button
             # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
-             # set UI.src (path ++ "/" ++ "refresh.png")
-              ]
-          on UI.click btn $ \_ -> getBody window # set children [] >> setup window
+                   # set UI.src (path ++ "/" ++ "refresh.png")
+               ]
+        on UI.click btn $ \_ -> getBody window # set children [] >> setup window
 
-          return btn
+        return btn
 
   -- Add buttons to the body of the HTML document
   void $ getBody window #+ [refreshButton, modeButton, buttons]
@@ -94,12 +97,13 @@ mkCell actionOnClick modeRef (indices, s) = do
   on UI.click btn $ \_ -> do
     mode <- liftIO $ readIORef modeRef
     actionOnClick indices (boardAction mode True)
-  on UI.contextmenu btn $ \_ -> do 
+  on UI.contextmenu btn $ \_ -> do
     mode <- liftIO $ readIORef modeRef
     actionOnClick indices (boardAction mode False)
 
   return btn
-  where boardAction m isClick = if (m == Mining) /= isClick then toggleFlag else revealCell
+  where
+    boardAction m isClick = if (m == Mining) /= isClick then toggleFlag else revealCell
 
 mkRow actionOnClick modeRef cols =
   UI.tr
