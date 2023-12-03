@@ -10,17 +10,14 @@ import Control.Monad.Random (MonadRandom (getRandomR))
 import Data.List (find)
 import Data.Maybe (fromMaybe, isJust)
 
+-- A type of move, including the index to play it at
 data Move = Uncover !(Int, Int) | Flag !(Int, Int)
 
-getSquareSafe :: VisualBoard -> (Int, Int) -> Maybe ((Int, Int), VisualState)
-getSquareSafe b@VisualBoard {grid = g} ind@(i, j) =
-  if inBounds b ind
-    then Just ((g !! i) !! j)
-    else Nothing
-
+-- Get a square unsafely
 getSquareUnsafe :: VisualBoard -> (Int, Int) -> ((Int, Int), VisualState)
 getSquareUnsafe b@VisualBoard {grid = g} (i, j) = (g !! i) !! j
 
+-- Get the neighbours of a cell
 getNeighbours :: VisualBoard -> (Int, Int) -> [((Int, Int), VisualState)]
 getNeighbours b (i, j) =
   let neighbourIndices =
@@ -28,9 +25,11 @@ getNeighbours b (i, j) =
         ]
    in map (getSquareUnsafe b) neighbourIndices
 
+-- Get a list of indexed cells that satisfy a condition
 getIf :: [[t]] -> (t -> Bool) -> [t]
 getIf g predicate = [t | row <- g, t <- row, predicate t]
 
+-- Uncover a random square
 uncoverRandom :: MonadRandom m => VisualBoard -> m (Int, Int)
 uncoverRandom b@VisualBoard {state = s, grid = g} =
   if null coveredIndices
@@ -42,6 +41,7 @@ uncoverRandom b@VisualBoard {state = s, grid = g} =
     coveredIndices = map fst $ getIf g (\(_, vs) -> vs == Covered)
     maxIndex = length coveredIndices - 1
 
+-- Make a move, by the strategy of tryPlayObvious, if there is no obvious move, return Nothing
 makeMove :: VisualBoard -> Maybe Move
 makeMove b@VisualBoard {state = s, grid = g} =
   if s /= Playing
@@ -68,12 +68,15 @@ tryPlayObvious b@VisualBoard {state = s, grid = g} ind@(i, j) =
                 else Nothing
     _ -> Nothing
 
+-- Auxiliary function to make the first move in a list, or Nothing if it's empty, takes in the type of move and a list of indices and cell in our case (we only care about the indices)
 moveOnFirst :: (t -> a) -> [(t, b)] -> Maybe a
 moveOnFirst _ [] = Nothing
 moveOnFirst m (first : _) = Just (m (fst first))
 
+-- Uncover the first, using moveOnFirst
 uncoverFirst :: [((Int, Int), b)] -> Maybe Move
 uncoverFirst = moveOnFirst Uncover
 
+-- Flag the first, using moveOnFirst
 flagFirst :: [((Int, Int), b)] -> Maybe Move
 flagFirst = moveOnFirst Flag
