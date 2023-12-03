@@ -71,8 +71,18 @@ setup window = do
         updateVisuals updatedBoard revealAndUpdateBoard -- This is bugged and hangs the program
   let buttons = mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
 
+  let refreshButton = do
+          btn <- UI.button 
+            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+            #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+             # set UI.src (path ++ "/" ++ "refresh.png")
+              ]
+          on UI.click btn $ \_ -> getBody window # set children [] >> setup window
+
+          return btn
+
   -- Add buttons to the body of the HTML document
-  void $ getBody window #+ [modeButton, buttons]
+  void $ getBody window #+ [refreshButton, modeButton, buttons]
 
 mkCell actionOnClick modeRef (indices, s) = do
   btn <-

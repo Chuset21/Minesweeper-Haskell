@@ -31,10 +31,6 @@ data Cell = Cell
 
 data CellState = Flagged_ | Unrevealed | Revealed deriving (Eq, Show)
 
-debugPrintCell :: Cell -> String
-debugPrintCell Cell {status = Flagged_} = "[F]"
-debugPrintCell Cell {hasMine = m} = if m then "[M]" else "[ ]"
-
 type Grid = V.Vector (V.Vector Cell)
 
 data Board = Board
@@ -51,10 +47,6 @@ data VisualBoard = VisualBoard
     grid :: ![[((Int, Int), VisualState)]]
   }
   deriving (Eq, Show)
-
-prettyPrintBoard :: Board -> String
-prettyPrintBoard Board {grid = g} =
-  unlines $ map (concatMap debugPrintCell) $ V.toList $ fmap V.toList g
 
 prettyPrintBoardWithNumbers :: Board -> String
 prettyPrintBoardWithNumbers b =
