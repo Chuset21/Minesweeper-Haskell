@@ -121,6 +121,7 @@ playMinesweeper size numOfMines window = do
             where
               name = (if m == Mining then "pickaxe" else "flag") ++ ".png"
 
+  -- This function handles updating the board visuals
   let updateVisuals board action = do
         element <- getElementById window "board"
         case element of
@@ -133,6 +134,8 @@ playMinesweeper size numOfMines window = do
               Playing -> pure ()
 
             void $ pure x # set children [buttons] -- Set new board
+  
+  -- This function handles revealing and updating the board visuals
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
         currentBoard <- liftIO $ readIORef boardRef
