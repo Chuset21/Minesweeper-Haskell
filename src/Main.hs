@@ -5,7 +5,7 @@ module Main where
 
 import Board
   ( Board (state),
-    BoardState (Lost, Playing, Won),
+    BoardState (..),
     VisualBoard (grid),
     VisualState (..),
     generateBoard,
@@ -59,15 +59,24 @@ setup window = do
 
   let modeButton = do
         mode <- liftIO $ readIORef modeRef
+        let image m =
+              [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+                  # set UI.src (getImage m)
+              ]
         btn <-
-          UI.button # set text (btnText mode)
+          UI.button
+            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+            #+ image mode
         on UI.click btn $ \_ -> do
           liftIO $ modifyIORef modeRef (\s -> if s == Flagging then Mining else Flagging)
           mode <- liftIO $ readIORef modeRef
-          element btn # set text (btnText mode)
+          element btn # set children []
+          element btn #+ image mode
         return btn
         where
-          btnText m = "Current mode: " ++ show m
+          getImage m = path ++ "/" ++ name
+            where
+              name = (if m == Mining then "pickaxe" else "flag") ++ ".png"
 
   let updateVisuals board action = do
         element <- getElementById window "board"
@@ -109,13 +118,26 @@ setup window = do
 
         return btn
 
+  let homeButton = do
+        btn <-
+          UI.button
+            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+            #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+                   # set UI.src (path ++ "/" ++ "home-button.png")
+               ]
+        on UI.click btn $ \_ -> liftIO $ print "Home button clicked!!!" -- TODO
+
+        return btn
+
   void $
     getBody window
       #+ [ UI.div
-             # set style [("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
-             #+ [ UI.div #+ [refreshButton, modeButton],
+             # set style [("width", "600px"), ("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
+             #+ [ UI.div
+                    # set style [("display", "flex"), ("flexDirection", "row"), ("justifyContent", "space-around")]
+                    #+ [homeButton, refreshButton, modeButton], -- Evenly space buttons in this div
                   UI.div
-                    # set style [("width", "600px"), ("height", "600px")]
+                    # set style [("width", "100%"), ("height", "600px")]
                     #+ [buttons, element endText]
                 ]
          ]
