@@ -26,7 +26,7 @@ path = "static"
 
 main :: IO ()
 main = do
-  startGUI defaultConfig {jsStatic = Just path} setup
+  startGUI defaultConfig {jsStatic = Just path} $ playMinesweeper 10 10
 
 imageURL :: VisualState -> String
 imageURL s = path ++ "/" ++ imageFileName s
@@ -39,13 +39,13 @@ imageFileName (SurroundingMines n) = "number" ++ show n ++ ".png"
 imageFileName Flagged = "flag.png"
 imageFileName Exploded = "exploded.png"
 
-setup :: Window -> UI ()
-setup window = do
+playMinesweeper :: Int -> Int -> Window -> UI ()
+playMinesweeper size numOfMines window = do
   return window # set title "Minesweeper"
   runFunction $ ffi "document.addEventListener('contextmenu', function(event) {event.preventDefault();});" -- Disable the context menu popup on right clicks
 
   -- Create a mutable reference to the board
-  boardRef <- liftIO $ newIORef =<< generateBoard 10 10
+  boardRef <- liftIO $ newIORef =<< generateBoard size numOfMines
   board <- liftIO $ readIORef boardRef
 
   modeRef <- liftIO $ newIORef Mining
