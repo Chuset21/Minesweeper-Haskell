@@ -54,7 +54,11 @@ path = "static"
 getDiff :: VisualBoard -> VisualBoard -> [((Int, Int), VisualState)]
 getDiff VisualBoard {grid = prev} VisualBoard {grid = new} = concat new \\ concat prev
 
-changeDiffs window prev new =
+-- Get diff with a waterfall effect - when this is used for changing cells it will cause a waterfall like effect
+getDiffWaterfall :: VisualBoard -> VisualBoard -> [((Int, Int), VisualState)]
+getDiffWaterfall VisualBoard {grid = prev} VisualBoard {grid = new} = concat $ new \\ prev
+
+changeDiffsWithFunc diffFunc window prev new =
   mapM_
     ( \(ind, s) -> do
         element <- getElementById window $ show ind
@@ -64,7 +68,11 @@ changeDiffs window prev new =
             img <- getCellImage s
             void $ pure cell # set children [img]
     )
-    (getDiff prev new)
+    (diffFunc prev new)
+
+changeDiffs = changeDiffsWithFunc getDiff
+
+changeDiffsWaterfall = changeDiffsWithFunc getDiffWaterfall
 
 getCellImage :: VisualState -> UI UI.Element
 getCellImage s = fromJust (Map.lookup s images) -- This should never throw
@@ -245,7 +253,8 @@ playMinesweeper size numOfMines window = do
           liftIO $ writeIORef boardRef updatedBoard
 
           -- Only change the differences
-          changeDiffs window (getBoardVisuals prevBoard) (getBoardVisuals updatedBoard)
+          let changeFunc = if state updatedBoard /= Playing then changeDiffsWaterfall else changeDiffs
+          changeFunc window (getBoardVisuals prevBoard) (getBoardVisuals updatedBoard)
 
           showEndGameBanner $ state updatedBoard
 
@@ -311,7 +320,7 @@ playMinesweeper size numOfMines window = do
     new <- liftIO $ generateBoard size numOfMines
     liftIO $ writeIORef boardRef new
     setTextAndStyles "" []
-    changeDiffs window (getBoardVisuals prev) (getBoardVisuals new)
+    changeDiffsWaterfall window (getBoardVisuals prev) (getBoardVisuals new)
 
   on UI.click autoMoveButton $ \_ -> do
     currentBoard <- liftIO $ readIORef boardRef
