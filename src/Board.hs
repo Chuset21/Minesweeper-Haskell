@@ -16,10 +16,14 @@ module Board
 where
 
 import Control.Monad.Random
-    ( Random(randomRs), MonadRandom(getRandomRs) )
-import Data.List ( foldl', groupBy, nub )
+  ( MonadRandom (getRandomRs),
+    Random (randomRs),
+  )
+import Data.List (foldl', groupBy, nub)
 import qualified Data.Vector as V
-import System.Random ( Random(randomRs), RandomGen(split) )
+import System.Random (Random (randomRs), RandomGen (split))
+import GHC.IO (unsafePerformIO)
+import GHC.Stack (HasCallStack)
 
 -- Board state
 data BoardState = Lost | Playing | Won deriving (Eq, Show)
@@ -116,20 +120,20 @@ getIndexedMatrix :: Board -> [[((Int, Int), Cell)]]
 getIndexedMatrix b = groupBy (\((x, _), _) ((y, _), _) -> x == y) (getIndexedList b) -- We want to separate the list by row, so whenever the row isn't equal, separate it onto a new list
 
 -- Get a cell at an index unsafely
-getCellAtIndexUnsafe :: Board -> (Int, Int) -> Cell
+getCellAtIndexUnsafe :: HasCallStack => Board -> (Int, Int) -> Cell
 getCellAtIndexUnsafe Board {grid = g} (i, j) = (g V.! i) V.! j
 
 -- Get a cell at an index safely
-getCellAtIndex :: Board -> (Int, Int) -> Maybe Cell
+getCellAtIndex :: HasCallStack => Board -> (Int, Int) -> Maybe Cell
 getCellAtIndex Board {grid = g} (i, j) = do
   row <- g V.!? i
   row V.!? j
 
 -- Get a cell's neighbours, only the index of the cell is needed, not the actual cell
-getNeighbours :: Board -> (Int, Int) -> [((Int, Int), Cell)]
+getNeighbours :: HasCallStack => Board -> (Int, Int) -> [((Int, Int), Cell)]
 getNeighbours b (i, j) =
   let neighbourIndices =
-        [ (x, y) | x <- [i -1 .. i + 1], y <- [j -1 .. j + 1], not $ (x == i) && (y == j), inBounds b (x, y)
+        [ (x, y) | x <- [i - 1 .. i + 1], y <- [j - 1 .. j + 1], not $ (x == i) && (y == j), inBounds b (x, y)
         ]
    in map (\i -> (i, getCellAtIndexUnsafe b i)) neighbourIndices
 
@@ -162,7 +166,7 @@ generateBoard size numBombs = do
   return $ Board Playing grid numBombs
 
 -- Update a cell status and return the new grid containing the new cell
-updateCellStatus :: (Cell -> CellState) -> Board -> (Int, Int) -> Board
+updateCellStatus :: HasCallStack => (Cell -> CellState) -> Board -> (Int, Int) -> Board
 updateCellStatus getNewState b@Board {grid = g} (i, j) =
   b {grid = newGrid}
   where

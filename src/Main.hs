@@ -11,11 +11,15 @@ import Board
     VisualState (..),
     generateBoard,
     getBoardVisuals,
+    inBounds,
     revealCell,
     toggleFlag,
   )
+import Control.Exception (evaluate)
 import Control.Monad (void, when)
 import Data.IORef (modifyIORef, newIORef, readIORef, writeIORef)
+import GHC.IORef (IORef)
+import GHC.Stack (HasCallStack, callStack, prettyCallStack)
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
   ( Config (jsStatic),
@@ -77,9 +81,10 @@ mainPageButtonStyles =
 deleteAll window = getBody window # set children []
 
 -- Landing page to select your difficulty
-setup :: Window -> UI ()
+setup :: HasCallStack => Window -> UI ()
 setup window = do
-  deleteAll window 
+  deleteAll window
+  liftIO $ putStrLn $ prettyCallStack callStack
   getBody window # set style [("background-image", "url('https://www.newegg.com/insider/wp-content/uploads/2014/04/windows_xp_bliss-wide.jpg')")] -- Windows background
   return window # set title "Minesweeper"
 
@@ -98,6 +103,12 @@ setup window = do
               ]
        ]
 
+  let deleteMainScreen _ = do
+        UI.delete pageTitle
+        UI.delete easyBtn
+        UI.delete mediumBtn
+        UI.delete hardBtn
+
   -- I went off of the difficulties seen online, the google game that shows up when you search for minesweeper
   on UI.click easyBtn $ \_ -> do
     playMinesweeper 10 10 window
@@ -109,9 +120,9 @@ setup window = do
     playMinesweeper 24 99 window
 
 -- Play the actual minesweeper game
-playMinesweeper :: Int -> Int -> Window -> UI ()
+playMinesweeper :: HasCallStack => Int -> Int -> Window -> UI ()
 playMinesweeper size numOfMines window = do
-  deleteAll window 
+  deleteAll window
   runFunction $ ffi "document.addEventListener('contextmenu', function(event) {event.preventDefault();});" -- Disable the context menu popup on right clicks
 
   -- Create a mutable reference to the board
@@ -122,7 +133,8 @@ playMinesweeper size numOfMines window = do
   modeRef <- liftIO $ newIORef Mining
 
   endText <- UI.div
-  let setTextAndStyles s styles =
+  let setTextAndStyles :: HasCallStack => String -> [(String, String)] -> UI UI.Element
+      setTextAndStyles s styles =
         element endText
           # set style styles
           # set UI.text s
@@ -148,7 +160,8 @@ playMinesweeper size numOfMines window = do
           getImage m = path ++ "/" ++ ((if m == Mining then "pickaxe" else "flag") ++ ".png")
 
   -- This function handles updating the board visuals
-  let updateVisuals board action = do
+  let updateVisuals :: HasCallStack => Board -> ((Int, Int) -> (Board -> (Int, Int) -> Board) -> UI void) -> UI ()
+      updateVisuals board action = do
         element <- getElementById window "board"
         case element of
           Nothing -> pure ()
@@ -163,16 +176,20 @@ playMinesweeper size numOfMines window = do
 
   -- This function handles revealing and updating the board visuals
   -- TODO: fix bug where sometimes you are sent back to the main screen (setup function) when you didn't click home
-  let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
+  let revealAndUpdateBoard :: HasCallStack => (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
         currentBoard <- liftIO $ readIORef boardRef
         -- Update the board state by running the update action
         when (state currentBoard == Playing) $ do
           let updatedBoard = action currentBoard indices
           -- Write the updated state back to the IORef
+          liftIO $ print $ inBounds currentBoard indices
+          liftIO $ evaluate updatedBoard
           liftIO $ writeIORef boardRef updatedBoard
 
+          liftIO $ print "About to update visuals"
           updateVisuals updatedBoard revealAndUpdateBoard
+          liftIO $ print "Updated visuals"
 
   -- Button to start a new game in the current difficulty
   let refreshButton = do
@@ -206,17 +223,37 @@ playMinesweeper size numOfMines window = do
             #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
                    # set UI.src (path ++ "/" ++ "play.png")
                ]
-        on UI.click btn $ \_ -> do
-          currentBoard <- liftIO $ readIORef boardRef
-          when (state currentBoard == Playing) $ do
-            case makeMove $ getBoardVisuals currentBoard of
-              Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
-              Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
-              Nothing -> do
-                x <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
-                revealAndUpdateBoard x revealCell
+
+        let callback :: HasCallStack => p -> UI ()
+            callback = \_ -> do
+              currentBoard <- liftIO $ readIORef boardRef
+              when (state currentBoard == Playing) $ do
+                liftIO $ print "About to try to make move"
+                case makeMove $ getBoardVisuals currentBoard of
+                  Just (Uncover ind) -> do
+                    liftIO $ print $ "About to try to try uncover (make move) " ++ show ind
+                    revealAndUpdateBoard ind revealCell
+                    liftIO $ print $ "Uncovered (make move) " ++ show ind
+                  Just (Flag ind) -> do
+                    liftIO $ print $ "About to try to try flag " ++ show ind
+                    revealAndUpdateBoard ind toggleFlag
+                    liftIO $ print $ "Flagged " ++ show ind
+                  Nothing -> do
+                    liftIO $ print "About to try to uncover Random"
+                    ind <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
+                    liftIO $ print $ "About to try to uncover (random) " ++ show ind
+                    revealAndUpdateBoard ind revealCell
+                    liftIO $ print $ "Uncovered (random) " ++ show ind
+        on UI.click btn callback
         return btn
 
+  let crashButton = do
+        btn <-
+          UI.button
+            # set text "Crash"
+        on UI.click btn $ \_ -> liftIO $ print $ [1] !! 20
+
+        return btn
   -- Element representing the minesweeper board, as a table of buttons
   let boardElement = mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
 
@@ -226,7 +263,7 @@ playMinesweeper size numOfMines window = do
              # set style [("width", "600px"), ("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
              #+ [ UI.div
                     # set style [("display", "flex"), ("flexDirection", "row"), ("justifyContent", "space-around")]
-                    #+ [homeButton, refreshButton, modeButton, autoMoveButton], -- Evenly space buttons in this div
+                    #+ [crashButton, homeButton, refreshButton, modeButton, autoMoveButton], -- Evenly space buttons in this div
                   UI.div
                     # set style [("width", "100%"), ("height", "600px")]
                     #+ [boardElement, element endText]
@@ -246,6 +283,7 @@ darkSoulsDeathStyle =
   ]
 
 -- Make an individual cell, with a callback
+mkCell :: HasCallStack => (t -> (Board -> (Int, Int) -> Board) -> UI void) -> IORef Mode -> (t, VisualState) -> UI UI.Element
 mkCell actionOnClick modeRef (indices, s) = do
   btn <-
     UI.td
@@ -253,24 +291,31 @@ mkCell actionOnClick modeRef (indices, s) = do
       #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
              # set UI.src (imageURL s)
          ]
-  on UI.click btn $ \_ -> do
-    mode <- liftIO $ readIORef modeRef
-    actionOnClick indices (boardAction mode True)
-  on UI.contextmenu btn $ \_ -> do
-    mode <- liftIO $ readIORef modeRef
-    actionOnClick indices (boardAction mode False)
+  let clickCallback :: HasCallStack => p -> UI ()
+      clickCallback _ = do
+        mode <- liftIO $ readIORef modeRef
+        void $ actionOnClick indices (boardAction mode True)
+  let contextCallback :: HasCallStack => p -> UI ()
+      contextCallback _ = do
+        mode <- liftIO $ readIORef modeRef
+        void $ actionOnClick indices (boardAction mode False)
+
+  on UI.click btn clickCallback
+  on UI.contextmenu btn contextCallback
 
   return btn
   where
     boardAction m isClick = if (m == Mining) /= isClick then toggleFlag else revealCell
 
 -- Make a row of cells
+mkRow :: HasCallStack => (t -> (Board -> (Int, Int) -> Board) -> UI void) -> IORef Mode -> [(t, VisualState)] -> UI UI.Element
 mkRow actionOnClick modeRef cols =
   UI.tr
     # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
     #+ map (mkCell actionOnClick modeRef) cols
 
 -- Make a table of cells
+mkTable :: HasCallStack => (t -> (Board -> (Int, Int) -> Board) -> UI void) -> IORef Mode -> [[(t, VisualState)]] -> UI UI.Element
 mkTable actionOnClick modeRef rows =
   UI.table
     # set UI.id_ "board"

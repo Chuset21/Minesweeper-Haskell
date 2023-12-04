@@ -9,12 +9,13 @@ import Board
 import Control.Monad.Random (MonadRandom (getRandomR))
 import Data.List (find)
 import Data.Maybe (fromMaybe, isJust)
+import GHC.Stack (HasCallStack)
 
 -- A type of move, including the index to play it at
 data Move = Uncover !(Int, Int) | Flag !(Int, Int)
 
 -- Get a square unsafely
-getSquareUnsafe :: VisualBoard -> (Int, Int) -> ((Int, Int), VisualState)
+getSquareUnsafe :: HasCallStack => VisualBoard -> (Int, Int) -> ((Int, Int), VisualState)
 getSquareUnsafe b@VisualBoard {grid = g} (i, j) = (g !! i) !! j
 
 -- Get the neighbours of a cell
@@ -30,7 +31,7 @@ getIf :: [[t]] -> (t -> Bool) -> [t]
 getIf g predicate = [t | row <- g, t <- row, predicate t]
 
 -- Uncover a random square
-uncoverRandom :: MonadRandom m => VisualBoard -> m (Int, Int)
+uncoverRandom :: HasCallStack => MonadRandom m => VisualBoard -> m (Int, Int)
 uncoverRandom b@VisualBoard {state = s, grid = g} =
   if null coveredIndices
     then pure (0, 0) -- This should never happen, since this shouldn't be called when the game state isn't 'Playing' or if all the remaining cells are flagged (some must be flagged wrong, but the AI did not do this)
@@ -39,10 +40,9 @@ uncoverRandom b@VisualBoard {state = s, grid = g} =
       pure (coveredIndices !! i)
   where
     coveredIndices = map fst $ getIf g (\(_, vs) -> vs == Covered)
-    maxIndex = length coveredIndices - 1
 
 -- Make a move, by the strategy of tryPlayObvious, if there is no obvious move, return Nothing
-makeMove :: VisualBoard -> Maybe Move
+makeMove :: HasCallStack => VisualBoard -> Maybe Move
 makeMove b@VisualBoard {state = s, grid = g} =
   if s /= Playing
     then Nothing
