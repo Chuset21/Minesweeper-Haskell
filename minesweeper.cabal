@@ -22,3 +22,4 @@ executable minesweeper
                      , vector
                      , random
                      , MonadRandom
+                     , containers

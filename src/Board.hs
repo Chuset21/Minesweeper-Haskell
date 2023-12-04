@@ -48,7 +48,7 @@ data Board = Board
 
 -- The state that the user sees a cell as, this is to be used to show the state of the game is in conjuction with VisualBoard
 -- Users can then use this to create programs that play the game, or play it themselves with some sort of GUI or visual representation
-data VisualState = Covered | Uncovered | Flagged | Exploded | SurroundingMines !Int deriving (Eq, Show)
+data VisualState = Covered | Uncovered | Flagged | Exploded | SurroundingMines !Int deriving (Eq, Show, Ord)
 
 -- A visual board, this is exported and can be used to see the information about the game
 -- This ensures that cheating and checking if there is a mine at a square is not possible

@@ -7,7 +7,7 @@ import Agent (Move (..), makeMove, uncoverRandom)
 import Board
   ( Board (state),
     BoardState (..),
-    VisualBoard (grid),
+    VisualBoard (VisualBoard, grid),
     VisualState (..),
     generateBoard,
     getBoardVisuals,
@@ -15,7 +15,10 @@ import Board
     toggleFlag,
   )
 import Control.Monad (void, when)
-import Data.IORef (modifyIORef, newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, modifyIORef, newIORef, readIORef, writeIORef)
+import Data.List ((\\))
+import qualified Data.Map as Map
+import Data.Maybe (fromJust)
 import qualified Graphics.UI.Threepenny as UI
 import Graphics.UI.Threepenny.Core
   ( Config (jsStatic),
@@ -42,23 +45,113 @@ import Graphics.UI.Threepenny.Core
   )
 import System.Random (RandomGen)
 
--- Data to know if we're in flagging mode or mining, I used this instead of a boolean for readability
-data Mode = Flagging | Mining deriving (Eq, Show)
+-- Type to know if we're in flagging mode or mining, I used this instead of a boolean for readability
+data Mode = Flagging | Mining deriving (Eq, Show, Ord, Enum, Bounded)
 
 -- The path to our images
 path = "static"
 
+getDiff :: VisualBoard -> VisualBoard -> [((Int, Int), VisualState)]
+getDiff VisualBoard {grid = prev} VisualBoard {grid = new} = concat new \\ concat prev
+
+changeDiffs window prev new =
+  mapM_
+    ( \(ind, s) -> do
+        element <- getElementById window $ show ind
+        case element of
+          Nothing -> pure ()
+          Just cell -> do
+            img <- getCellImage s
+            void $ pure cell # set children [img]
+    )
+    (getDiff prev new)
+
+getCellImage :: VisualState -> UI UI.Element
+getCellImage s = fromJust (Map.lookup s images) -- This should never throw
+
+-- Cache the images
+images :: Map.Map VisualState (UI UI.Element)
+images =
+  Map.fromList $
+    [ (Covered, buildCellImage Covered),
+      (Uncovered, buildCellImage Uncovered),
+      (Flagged, buildCellImage Flagged),
+      (Exploded, buildCellImage Exploded)
+    ]
+      ++ [(SurroundingMines n, buildCellImage $ SurroundingMines n) | n <- [1 .. 8]]
+
+-- Build a cell image
+buildCellImage s =
+  UI.img
+    # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+    # set UI.src (imageURL s)
+
 -- Function to get image URL
 imageURL :: VisualState -> String
-imageURL s = path ++ "/" ++ imageFileName s
+imageURL = getImagePath . imageFileName
 
 -- Go from VisualState to an image
 imageFileName :: VisualState -> String
-imageFileName Covered = "covered.png"
-imageFileName Uncovered = "uncovered.png"
-imageFileName (SurroundingMines n) = "number" ++ show n ++ ".png"
-imageFileName Flagged = "flag.png"
-imageFileName Exploded = "exploded.png"
+imageFileName Covered = "covered"
+imageFileName Uncovered = "uncovered"
+imageFileName (SurroundingMines n) = "number" ++ show n
+imageFileName Flagged = "flag"
+imageFileName Exploded = "exploded"
+
+modeImageClassName = "modeImage"
+
+boardId = "board"
+
+cellClassName = "cell"
+
+rowClassName = "row"
+
+-- Delete all the board elements
+deleteAllBoardElements :: Window -> UI ()
+deleteAllBoardElements window = do
+  mapM_ UI.delete =<< UI.getElementsByClassName window cellClassName
+  mapM_ UI.delete =<< UI.getElementsByClassName window rowClassName
+
+getModeImage :: Mode -> UI UI.Element
+getModeImage m = fromJust (Map.lookup m modeImages) -- This should never throw
+
+-- Cache mode images
+modeImages :: Map.Map Mode (UI UI.Element)
+modeImages = Map.fromList [(x, buildModeImage x) | x <- [minBound :: Mode .. maxBound]]
+
+-- Build a mode image for the mode butoon
+buildModeImage :: Mode -> UI UI.Element
+buildModeImage m =
+  UI.img
+    # set UI.class_ modeImageClassName
+    # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+    # set UI.src (getModeImageName m)
+
+-- Get the mode image name
+getModeImageName :: Mode -> String
+getModeImageName m = getImagePath (if m == Mining then "pickaxe" else "flag")
+
+-- Get image path
+getImagePath :: String -> String
+getImagePath imageName = path ++ "/" ++ imageName ++ ".png"
+
+-- Image for refresh icon
+refreshImage :: UI UI.Element
+refreshImage =
+  UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+    # set UI.src (getImagePath "refresh")
+
+-- Image for home icon
+homeImage :: UI UI.Element
+homeImage =
+  UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+    # set UI.src (getImagePath "home-button")
+
+-- Image for auto move icon
+autoMoveImage :: UI UI.Element
+autoMoveImage =
+  UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+    # set UI.src (getImagePath "play")
 
 main :: IO ()
 main = do
@@ -73,13 +166,13 @@ mainPageButtonStyles =
     ("border-radius", "5px")
   ]
 
--- Function to delete everything on the page, used for resetting or 'changing' page
-deleteAll window = getBody window # set children []
+-- Function used for remove all contenct from the page
+resetAllChildren window = getBody window # set children []
 
 -- Landing page to select your difficulty
 setup :: Window -> UI ()
 setup window = do
-  deleteAll window 
+  resetAllChildren window
   getBody window # set style [("background-image", "url('https://www.newegg.com/insider/wp-content/uploads/2014/04/windows_xp_bliss-wide.jpg')")] -- Windows background
   return window # set title "Minesweeper"
 
@@ -88,30 +181,37 @@ setup window = do
   mediumBtn <- UI.button #+ [string "Medium"] # set style (("margin-bottom", "40px") : mainPageButtonStyles)
   hardBtn <- UI.button #+ [string "Hard"] # set style mainPageButtonStyles
 
-  getBody window
-    #+ [ element pageTitle,
-         UI.div
-           # set style [("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
-           #+ [ UI.div
-                  # set style [("display", "flex"), ("flexDirection", "column"), ("justifyContent", "space-around")]
-                  #+ [element easyBtn, element mediumBtn, element hardBtn] -- Evenly space buttons in this div
-              ]
-       ]
+  let homePage =
+        [ element pageTitle,
+          UI.div
+            # set style [("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
+            #+ [ UI.div
+                   # set style [("display", "flex"), ("flexDirection", "column"), ("justifyContent", "space-around")]
+                   #+ [element easyBtn, element mediumBtn, element hardBtn] -- Evenly space buttons in this div
+               ]
+        ]
+
+  let deleteHomePage () = mapM_ UI.delete [pageTitle, easyBtn, mediumBtn, hardBtn]
+
+  getBody window #+ homePage
 
   -- I went off of the difficulties seen online, the google game that shows up when you search for minesweeper
   on UI.click easyBtn $ \_ -> do
+    deleteHomePage ()
     playMinesweeper 10 10 window
 
   on UI.click mediumBtn $ \_ -> do
+    deleteHomePage ()
     playMinesweeper 18 40 window
 
   on UI.click hardBtn $ \_ -> do
+    deleteHomePage ()
     playMinesweeper 24 99 window
 
 -- Play the actual minesweeper game
 playMinesweeper :: Int -> Int -> Window -> UI ()
 playMinesweeper size numOfMines window = do
-  deleteAll window 
+  resetAllChildren window
   runFunction $ ffi "document.addEventListener('contextmenu', function(event) {event.preventDefault();});" -- Disable the context menu popup on right clicks
 
   -- Create a mutable reference to the board
@@ -127,111 +227,101 @@ playMinesweeper size numOfMines window = do
           # set style styles
           # set UI.text s
 
-  -- Button to display and change the current mode, mining or flagging
-  let modeButton = do
-        mode <- liftIO $ readIORef modeRef
-        btn <-
-          UI.button
-            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
-            #+ buildImage mode
-        on UI.click btn $ \_ -> do
-          liftIO $ modifyIORef modeRef (\s -> if s == Flagging then Mining else Flagging)
-          mode' <- liftIO $ readIORef modeRef
-          elements <- liftIO $ mapM (runUI window) (buildImage mode')
-          element btn # set children elements
-        return btn
-        where
-          buildImage m =
-            [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
-                # set UI.src (getImage m)
-            ]
-          getImage m = path ++ "/" ++ ((if m == Mining then "pickaxe" else "flag") ++ ".png")
-
-  -- This function handles updating the board visuals
-  let updateVisuals board action = do
-        element <- getElementById window "board"
-        case element of
-          Nothing -> pure ()
-          Just x -> do
-            newBoardElement <- liftIO $ mapM (runUI window . mkRow action modeRef) (grid $ getBoardVisuals board)
-            pure x # set children newBoardElement -- Set new board
-            -- Detect winning or losing condition and show appropriate text
-            case state board of
-              Won -> void $ setTextAndStyles "You Win!!" $ ("color", "rgba(0, 255, 0, 0.8)") : darkSoulsDeathStyle
-              Lost -> void $ setTextAndStyles "You Lose" $ ("color", "rgba(255, 0, 0, 0.8)") : darkSoulsDeathStyle
-              Playing -> pure ()
+  -- This functions handles winning or losing condition and showing appropriate text
+  let showEndGameBanner state = do
+        case state of
+          Won -> void $ setTextAndStyles "You Win!!" $ ("color", "rgba(0, 255, 0, 0.8)") : darkSoulsDeathStyle
+          Lost -> void $ setTextAndStyles "You Lose" $ ("color", "rgba(255, 0, 0, 0.8)") : darkSoulsDeathStyle
+          Playing -> pure ()
 
   -- This function handles revealing and updating the board visuals
-  -- TODO: fix bug where sometimes you are sent back to the main screen (setup function) when you didn't click home
   let revealAndUpdateBoard :: (Int, Int) -> (Board -> (Int, Int) -> Board) -> UI ()
       revealAndUpdateBoard indices action = do
-        currentBoard <- liftIO $ readIORef boardRef
+        prevBoard <- liftIO $ readIORef boardRef
         -- Update the board state by running the update action
-        when (state currentBoard == Playing) $ do
-          let updatedBoard = action currentBoard indices
+        when (state prevBoard == Playing) $ do
+          let updatedBoard = action prevBoard indices
           -- Write the updated state back to the IORef
           liftIO $ writeIORef boardRef updatedBoard
 
-          updateVisuals updatedBoard revealAndUpdateBoard
+          -- Only change the differences
+          changeDiffs window (getBoardVisuals prevBoard) (getBoardVisuals updatedBoard)
+
+          showEndGameBanner $ state updatedBoard
 
   -- Button to start a new game in the current difficulty
-  let refreshButton = do
-        btn <-
-          UI.button
-            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
-            #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
-                   # set UI.src (path ++ "/" ++ "refresh.png")
-               ]
-        on UI.click btn $ \_ -> playMinesweeper size numOfMines window
-
-        return btn
+  refreshButton <-
+    UI.button
+      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      #+ [refreshImage]
 
   -- Return to the home screen (setup function)
-  let homeButton = do
-        btn <-
-          UI.button
-            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
-            #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
-                   # set UI.src (path ++ "/" ++ "home-button.png")
-               ]
-        on UI.click btn $ \_ -> setup window
-
-        return btn
+  homeButton <-
+    UI.button
+      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      #+ [homeImage]
 
   -- Button to get the AI to play a move
-  let autoMoveButton = do
-        btn <-
-          UI.button
-            # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
-            #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
-                   # set UI.src (path ++ "/" ++ "play.png")
-               ]
-        on UI.click btn $ \_ -> do
-          currentBoard <- liftIO $ readIORef boardRef
-          when (state currentBoard == Playing) $ do
-            case makeMove $ getBoardVisuals currentBoard of
-              Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
-              Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
-              Nothing -> do
-                x <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
-                revealAndUpdateBoard x revealCell
-        return btn
+  autoMoveButton <-
+    UI.button
+      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      #+ [autoMoveImage]
+
+  -- Button to display and change the current mode, mining or flagging
+  modeButton <- do
+    mode <- liftIO $ readIORef modeRef
+    UI.button
+      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      #+ [getModeImage mode]
 
   -- Element representing the minesweeper board, as a table of buttons
-  let boardElement = mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
+  boardElement <- mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
 
-  void $
-    getBody window
-      #+ [ UI.div
-             # set style [("width", "600px"), ("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
-             #+ [ UI.div
-                    # set style [("display", "flex"), ("flexDirection", "row"), ("justifyContent", "space-around")]
-                    #+ [homeButton, refreshButton, modeButton, autoMoveButton], -- Evenly space buttons in this div
-                  UI.div
-                    # set style [("width", "100%"), ("height", "600px")]
-                    #+ [boardElement, element endText]
-                ]
-         ]
+  let minesweeperPage =
+        [ UI.div
+            # set style [("width", "600px"), ("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
+            #+ [ UI.div
+                   # set style [("display", "flex"), ("flexDirection", "row"), ("justifyContent", "space-around")]
+                   #+ map element [homeButton, refreshButton, modeButton, autoMoveButton], -- Evenly space buttons in this div
+                 UI.div
+                   # set style [("width", "100%"), ("height", "600px")]
+                   #+ map element [boardElement, endText]
+               ]
+        ]
+
+  let deleteMinesweeperPage () = do
+        deleteAllBoardElements window
+        mapM_ UI.delete [modeButton, homeButton, refreshButton, autoMoveButton, boardElement, endText]
+        minesweeperPageElements <- liftIO $ mapM (runUI window) minesweeperPage
+        mapM_ UI.delete minesweeperPageElements
+  getBody window #+ minesweeperPage
+
+  -- Click handlers
+  on UI.click modeButton $ \_ -> do
+    liftIO $ modifyIORef modeRef (\s -> if s == Flagging then Mining else Flagging)
+    mode <- liftIO $ readIORef modeRef
+    modeImg <- getModeImage mode
+    element modeButton # set children [modeImg]
+
+  on UI.click homeButton $ \_ -> do
+    deleteMinesweeperPage ()
+    setup window
+  on UI.click refreshButton $ \_ -> do
+    prev <- liftIO $ readIORef boardRef
+    new <- liftIO $ generateBoard size numOfMines
+    liftIO $ writeIORef boardRef new
+    setTextAndStyles "" []
+    changeDiffs window (getBoardVisuals prev) (getBoardVisuals new)
+
+  on UI.click autoMoveButton $ \_ -> do
+    currentBoard <- liftIO $ readIORef boardRef
+    when (state currentBoard == Playing) $ do
+      case makeMove $ getBoardVisuals currentBoard of
+        Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
+        Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
+        Nothing -> do
+          x <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
+          revealAndUpdateBoard x revealCell
 
 -- A styling to have text be in the sort of "You Died" dark souls death style, even if you win...
 darkSoulsDeathStyle =
@@ -246,31 +336,35 @@ darkSoulsDeathStyle =
   ]
 
 -- Make an individual cell, with a callback
+mkCell :: ((Int, Int) -> (Board -> (Int, Int) -> Board) -> UI void) -> IORef Mode -> ((Int, Int), VisualState) -> UI UI.Element
 mkCell actionOnClick modeRef (indices, s) = do
   btn <-
     UI.td
+      # set UI.class_ cellClassName
+      # set UI.id_ (show indices)
       # set style [("width", "auto"), ("height", "auto"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
-      #+ [ UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
-             # set UI.src (imageURL s)
-         ]
-  on UI.click btn $ \_ -> do
-    mode <- liftIO $ readIORef modeRef
-    actionOnClick indices (boardAction mode True)
-  on UI.contextmenu btn $ \_ -> do
-    mode <- liftIO $ readIORef modeRef
-    actionOnClick indices (boardAction mode False)
+      #+ [getCellImage s]
+  on UI.click btn $ \_ -> getAction True
+  on UI.contextmenu btn $ \_ -> getAction False
 
   return btn
   where
+    -- Left click mines, right click flags if on mining mode, otherwise swap them around
     boardAction m isClick = if (m == Mining) /= isClick then toggleFlag else revealCell
+    getAction isClick = do
+      mode <- liftIO $ readIORef modeRef
+      actionOnClick indices (boardAction mode isClick)
 
 -- Make a row of cells
+mkRow :: ((Int, Int) -> (Board -> (Int, Int) -> Board) -> UI void) -> IORef Mode -> [((Int, Int), VisualState)] -> UI UI.Element
 mkRow actionOnClick modeRef cols =
   UI.tr
+    # set UI.class_ rowClassName
     # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
     #+ map (mkCell actionOnClick modeRef) cols
 
 -- Make a table of cells
+mkTable :: ((Int, Int) -> (Board -> (Int, Int) -> Board) -> UI void) -> IORef Mode -> [[((Int, Int), VisualState)]] -> UI UI.Element
 mkTable actionOnClick modeRef rows =
   UI.table
     # set UI.id_ "board"
