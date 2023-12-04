@@ -194,7 +194,7 @@ revealCellHelper b@Board {state = s, totalMines = mines} i =
     totalNumberOfCells = size b * size b
     newBoardState
       | hasMine $ getCellAtIndexUnsafe b i = Lost
-      | (totalNumberOfCells - mines) <= length (getIf b (\c -> status c == Revealed)) + 1 = Won -- + 1 because this is the old board
+      | (totalNumberOfCells - mines) <= length (getIf newBoard (\c -> status c == Revealed)) = Won
       | otherwise = s
 
 -- Users call this to toggle a covered square from being flagged or not
