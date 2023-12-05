@@ -83,11 +83,11 @@ inBounds b (i, j) = 0 <= i && 0 <= j && i < h && j < h
 -- Map a board to a visual board
 getBoardVisuals :: Board -> VisualBoard
 getBoardVisuals b@Board {state = s, totalMines = m} =
-  VisualBoard {state = s, grid = map (map (\c@(i, _) -> (i, cellToVisualState b c))) (getIndexedMatrix b), totalMines = m}
+  VisualBoard {state = s, grid = map (map (\c@(ind, _) -> (ind, cellToVisualState b c))) (getIndexedMatrix b), totalMines = m}
 
 -- Map a cell in a board to a visual state
 cellToVisualState :: Board -> ((Int, Int), Cell) -> VisualState
-cellToVisualState b@Board {state = s} (indices, cell) =
+cellToVisualState b@Board {state = s} (ind, cell) =
   case (s, status cell) of
     (Playing, st) -> cellStateToVisualState st
     (Won, st) -> case st of
@@ -99,7 +99,7 @@ cellToVisualState b@Board {state = s} (indices, cell) =
         else cellStateToVisualState st
   where
     getRevealedValue =
-      let n = countSurroundingMines b indices
+      let n = countSurroundingMines b ind
        in if n > 0 then SurroundingMines n else Uncovered
     cellStateToVisualState = \case
       Revealed -> getRevealedValue
