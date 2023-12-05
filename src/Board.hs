@@ -1,4 +1,5 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Board
   ( Board (state, totalMines),
@@ -178,22 +179,22 @@ setCellAtIndex b@Board {grid = g} ((i, j), newCell) =
   b {grid = g V.// [(i, (g V.! i) V.// [(j, newCell)])]}
 
 -- Update a cell status and return the new grid containing the new cell
-updateCellStatus :: (Cell -> CellState) -> Board -> (Int, Int) -> Board
+updateCellStatus :: (CellState -> CellState) -> Board -> (Int, Int) -> Board
 updateCellStatus getNewState b ind =
-  setCellAtIndex b (ind, (oldCell {status = getNewState oldCell}))
+  setCellAtIndex b (ind, (oldCell {status = getNewState $ status oldCell}))
   where
     oldCell = getCellAtIndexUnsafe b ind
 
 -- Users call this to reveal a cell
 revealCell :: Board -> (Int, Int) -> Board
-revealCell b i = maybe b (\c -> if status c == Unrevealed then revealCellHelper b i else b) (getCellAtIndex b i)
+revealCell b ind = maybe b (\c -> if status c == Unrevealed then revealCellHelper b ind else b) (getCellAtIndex b ind)
 
 -- This function reveals a cell and if it has no surrounding mines, it reveals all the cells around it, recursively
 revealNecessaryCells :: Board -> (Int, Int) -> Board
-revealNecessaryCells b i =
-  let newBoard = updateCellStatus (const Revealed) b i
-   in if countSurroundingMines b i == 0
-        then foldl' revealNecessaryCells newBoard (map fst $ filter (\(i, c) -> status c /= Revealed) (getNeighbours newBoard i)) -- Reveal all cells around it, make sure to not include revealed cells or infinite recursion... hard to find bug :(
+revealNecessaryCells b ind =
+  let newBoard = updateCellStatus (const Revealed) b ind
+   in if countSurroundingMines b ind == 0
+        then foldl' revealNecessaryCells newBoard (map fst $ filter (\(i, c) -> status c /= Revealed) (getNeighbours newBoard ind)) -- Reveal all cells around it, make sure to not include revealed cells or infinite recursion... hard to find bug :(
         else newBoard
 
 -- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
@@ -203,29 +204,29 @@ revealCellHelper b@Board {state = s, totalMines = mines} ind =
   if isMine && isFirstMove && isJust maybeIndexWithNoMine -- If first two conditions are met but no cell with no mine was found then they are all mines...
     then
       let indexWithNoMine = fromJust maybeIndexWithNoMine -- Find index with no mine
-          boardWithMineAtIndex = setCellAtIndex b (indexWithNoMine, Cell {hasMine = True, status = Unrevealed}) -- Put a mine at the index without a mine
+          boardWithMineAtIndex = setCellAtIndex b (indexWithNoMine, Cell {hasMine = True, status = status $ getCellAtIndexUnsafe b indexWithNoMine}) -- Put a mine at the index without a mine
           newBoard = setCellAtIndex boardWithMineAtIndex (ind, Cell {hasMine = False, status = Unrevealed}) -- Remove the mine at the current index
        in revealCellHelper newBoard ind -- Play the move with new board
     else
       let newBoard = revealNecessaryCells b ind
           newBoardState
-            | hasMine $ getCellAtIndexUnsafe b ind = Lost
+            | isMine = Lost
             | (size b * size b - mines) <= length (getIf newBoard (\c -> status c == Revealed)) = Won
             | otherwise = s
        in newBoard {state = newBoardState}
   where
-    isFirstMove = size b * size b == length (getIf b (\c -> status c == Unrevealed))
+    isFirstMove = null (getIf b (\c -> status c == Revealed))
     isMine = hasMine $ getCellAtIndexUnsafe b ind
     maybeIndexWithNoMine = tryFindIndexWithNoMine b
 
 -- Users call this to toggle a covered square from being flagged or not
 toggleFlag :: Board -> (Int, Int) -> Board
-toggleFlag b i = if inBounds b i then toggleFlagHelper b i else b
+toggleFlag b ind = if inBounds b ind then toggleFlagHelper b ind else b
 
 toggleFlagHelper :: Board -> (Int, Int) -> Board
 toggleFlagHelper =
   updateCellStatus
-    ( \c -> case status c of
+    ( \case
         Unrevealed -> Flagged_
         Flagged_ -> Unrevealed
         x -> x

@@ -95,10 +95,12 @@ images =
     ]
       ++ [(SurroundingMines n, buildCellImage $ SurroundingMines n) | n <- [1 .. 8]]
 
+commonImageStyles = [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+
 -- Build a cell image
 buildCellImage s =
   UI.img
-    # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+    # set style commonImageStyles
     # set UI.src (imageURL s)
 
 -- Function to get image URL
@@ -136,7 +138,7 @@ modeImages = Map.fromList [(x, buildModeImage x) | x <- [minBound :: Mode .. max
 buildModeImage :: Mode -> UI UI.Element
 buildModeImage m =
   UI.img
-    # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+    # set style commonImageStyles
     # set UI.src (getModeImageName m)
 
 -- Get the mode image name
@@ -150,19 +152,19 @@ getImagePath imageName = path ++ "/" ++ imageName ++ ".png"
 -- Image for refresh icon
 refreshImage :: UI UI.Element
 refreshImage =
-  UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+  UI.img # set style commonImageStyles
     # set UI.src (getImagePath "refresh")
 
 -- Image for home icon
 homeImage :: UI UI.Element
 homeImage =
-  UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+  UI.img # set style commonImageStyles
     # set UI.src (getImagePath "home-button")
 
 -- Image for auto move icon
 autoMoveImage :: UI UI.Element
 autoMoveImage =
-  UI.img # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
+  UI.img # set style commonImageStyles
     # set UI.src (getImagePath "play")
 
 main :: IO ()
@@ -341,8 +343,8 @@ playMinesweeper size numOfMines window = do
         Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
         Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
         Nothing -> do -- If we couldn't find an obvious move, make a random move
-          x <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
-          revealAndUpdateBoard x revealCell
+          ind <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
+          revealAndUpdateBoard ind revealCell
 
 -- Common minesweeper page button styles
 minesweeperUtilityButtonStyles = [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]

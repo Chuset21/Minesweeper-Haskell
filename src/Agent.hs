@@ -40,7 +40,7 @@ uncoverRandom b@VisualBoard {grid = g} =
       pure (coveredIndices !! i)
   where
     coveredIndices = map fst $ getIf g (\(_, vs) -> vs == Covered)
-    isFirstMove = length coveredIndices == size b * size b
+    isFirstMove = null $ getIf g (\(_, vs) -> case vs of SurroundingMines _ -> True; Uncovered -> True; _ -> False)
 
 -- Make a move, by the strategy of tryPlayObvious, if there is no obvious move, return Nothing
 makeMove :: VisualBoard -> Maybe Move
