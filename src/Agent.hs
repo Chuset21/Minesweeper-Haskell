@@ -33,7 +33,7 @@ getIf g predicate = filter predicate $ concat g
 -- Uncover a random square
 uncoverRandom :: MonadRandom m => VisualBoard -> m (Int, Int)
 uncoverRandom b@VisualBoard {grid = g} =
-  if isFirstMove || null coveredIndices -- If it's the first move, then go for the top right corenr, since it's best to go for the corners at the start, and we know that the cell will most likely be moved to 0,0 if the move was unsafe, like in the original minesweeper
+  if isFirstMove || null coveredIndices -- If it's the first move, then go for the top right corner, since it's best to go for the corners at the start, and we know that the cell will most likely be moved to 0,0 if the move was unsafe, like in the original minesweeper
     then pure (0, size b - 1) -- This should never happen outside the first move, since this shouldn't be called when the game state isn't 'Playing' or if all the remaining cells are flagged (some must be flagged wrong, but the AI did not do this)
     else do
       i <- getRandomR (0, length coveredIndices - 1)
