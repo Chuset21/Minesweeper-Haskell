@@ -52,7 +52,7 @@ makeMove b@VisualBoard {state = s, grid = g} =
        in fromMaybe Nothing $ find isJust (map (tryPlayObvious b . fst) cellsWithSurroundingMines) -- Map to get only the indices, then map to do tryPlayObvious, get the first valid move, or nothing if no such move exists
 
 -- If the current square has the same number of surrounding mines and flags then the rest of the squares must be safe to mine
--- If the current sqaure has the same number of surrounding mines squares as covered cells + flagged cells then they are all mines, we can flag them
+-- If the current square has the same number of surrounding mines as covered cells + flagged cells then they are all mines, we can flag them
 tryPlayObvious :: VisualBoard -> (Int, Int) -> Maybe Move
 tryPlayObvious b@VisualBoard {state = s, grid = g} ind@(i, j) =
   case snd $ getSquareUnsafe b ind of
