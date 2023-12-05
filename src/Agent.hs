@@ -27,7 +27,7 @@ getNeighbours b (i, j) =
 
 -- Get a list of indexed cells that satisfy a condition
 getIf :: [[t]] -> (t -> Bool) -> [t]
-getIf g predicate = [t | row <- g, t <- row, predicate t]
+getIf g predicate = filter predicate $ concat g
 
 -- Uncover a random square
 uncoverRandom :: MonadRandom m => VisualBoard -> m (Int, Int)
@@ -48,7 +48,7 @@ makeMove b@VisualBoard {state = s, grid = g} =
     then Nothing
     else
       let cellsWithSurroundingMines = getIf g (\(_, vs) -> case vs of SurroundingMines _ -> True; _ -> False) -- First get all the uncovered squares that have surrounding mines
-       in fromMaybe Nothing $ find isJust (map (tryPlayObvious b . fst) cellsWithSurroundingMines) -- Map to get only the indices, then map to do tryPlayObvious
+       in fromMaybe Nothing $ find isJust (map (tryPlayObvious b . fst) cellsWithSurroundingMines) -- Map to get only the indices, then map to do tryPlayObvious, get the first valid move, or nothing if no such move exists
 
 -- If the current square has the same number of surrounding mines and flags then the rest of the squares must be safe to mine
 -- If the current sqaure has the same number of surrounding mines squares as covered cells + flagged cells then they are all mines, we can flag them
