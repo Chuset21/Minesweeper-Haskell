@@ -4,6 +4,7 @@ import Board
   ( BoardState (..),
     VisualBoard (..),
     VisualState (..),
+    Boarded (size),
     inBounds,
   )
 import Control.Monad.Random (MonadRandom (getRandomR))
@@ -31,15 +32,15 @@ getIf g predicate = filter predicate $ concat g
 
 -- Uncover a random square
 uncoverRandom :: MonadRandom m => VisualBoard -> m (Int, Int)
-uncoverRandom b@VisualBoard {state = s, grid = g} =
-  if null coveredIndices
-    then pure (0, 0) -- This should never happen, since this shouldn't be called when the game state isn't 'Playing' or if all the remaining cells are flagged (some must be flagged wrong, but the AI did not do this)
+uncoverRandom b@VisualBoard {grid = g} =
+  if isFirstMove || null coveredIndices -- If it's the first move, then go for 0,0, since it's best to go for the corners at the start
+    then pure (0, 0) -- This should never happen outside the first move, since this shouldn't be called when the game state isn't 'Playing' or if all the remaining cells are flagged (some must be flagged wrong, but the AI did not do this)
     else do
       i <- getRandomR (0, length coveredIndices - 1)
       pure (coveredIndices !! i)
   where
     coveredIndices = map fst $ getIf g (\(_, vs) -> vs == Covered)
-    maxIndex = length coveredIndices - 1
+    isFirstMove = length coveredIndices == size b * size b
 
 -- Make a move, by the strategy of tryPlayObvious, if there is no obvious move, return Nothing
 makeMove :: VisualBoard -> Maybe Move
