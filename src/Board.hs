@@ -162,7 +162,7 @@ generateBoard size numBombs = do
       grid = V.generate size $ \i ->
         V.generate size $ \j ->
           Cell {hasMine = (i * size + j) `elem` randomIndices, status = Unrevealed}
-  return $ Board Playing grid numBombs
+  pure $ Board Playing grid numBombs
 
 -- Update a cell status and return the new grid containing the new cell
 updateCellStatus :: (Cell -> CellState) -> Board -> (Int, Int) -> Board
@@ -227,7 +227,7 @@ tryFindIndexWithNoMine :: Board -> Maybe (Int, Int)
 tryFindIndexWithNoMine b@Board {grid = g} = do
   i <- V.findIndex (V.any (not . hasMine)) g
   j <- V.findIndex (not . hasMine) (g V.! i)
-  return (i, j)
+  pure (i, j)
 
 -- Set cell at a particular index to a new value
 setCellAtIndex :: Board -> ((Int, Int), Cell) -> Board

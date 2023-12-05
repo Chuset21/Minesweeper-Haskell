@@ -187,7 +187,7 @@ setup :: Window -> UI ()
 setup window = do
   resetAllChildren window -- Reset the window, remove any elements that might still be there
   getBody window # set style [("background-image", "url('https://www.newegg.com/insider/wp-content/uploads/2014/04/windows_xp_bliss-wide.jpg')")] -- Windows background
-  return window # set title "Minesweeper"
+  pure window # set title "Minesweeper"
 
   pageTitle <- UI.h1 # set text "Minesweeper" # set style [("text-align", "center"), ("font-size", "6em")]
   easyBtn <- UI.button #+ [string "Easy"] # set style (("margin-bottom", "40px") : mainPageButtonStyles)
@@ -371,7 +371,7 @@ mkCell actionOnClick modeRef (indices, s) = do
   on UI.click btn $ \_ -> getAction True
   on UI.contextmenu btn $ \_ -> getAction False
 
-  return btn
+  pure btn
   where
     -- Left click mines, right click flags if on mining mode, otherwise swap them around
     boardAction m isClick = if (m == Mining) /= isClick then toggleFlag else revealCell
