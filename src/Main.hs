@@ -33,7 +33,6 @@ import Graphics.UI.Threepenny.Core
     getElementById,
     on,
     runFunction,
-    runUI,
     set,
     startGUI,
     string,
@@ -51,13 +50,16 @@ data Mode = Flagging | Mining deriving (Eq, Show, Ord, Enum, Bounded)
 -- The path to our images
 path = "static"
 
+-- Get the difference between two boards
 getDiff :: VisualBoard -> VisualBoard -> [((Int, Int), VisualState)]
 getDiff VisualBoard {grid = prev} VisualBoard {grid = new} = concat new \\ concat prev
 
--- Get diff with a waterfall effect - when this is used for changing cells it will cause a waterfall like effect
+-- Get diff with a waterfall effect - when this is used for changing cells it will cause a waterfall like effect, this is less efficient than getDiff
 getDiffWaterfall :: VisualBoard -> VisualBoard -> [((Int, Int), VisualState)]
 getDiffWaterfall VisualBoard {grid = prev} VisualBoard {grid = new} = concat $ new \\ prev
 
+-- Helper to change all the different cells, given a diff function and two boards
+changeDiffsWithFunc :: (Foldable f, Show a) => (x -> y -> f (a, VisualState)) -> Window -> x -> y -> UI ()
 changeDiffsWithFunc diffFunc window prev new =
   mapM_
     ( \(ind, s) -> do
@@ -70,14 +72,19 @@ changeDiffsWithFunc diffFunc window prev new =
     )
     (diffFunc prev new)
 
+-- Change the diffs using getDiff as the diff function
+changeDiffs :: Window -> VisualBoard -> VisualBoard -> UI ()
 changeDiffs = changeDiffsWithFunc getDiff
 
+-- Change the diffs with getDiffWaterfall as the diff function
+changeDiffsWaterfall :: Window -> VisualBoard -> VisualBoard -> UI ()
 changeDiffsWaterfall = changeDiffsWithFunc getDiffWaterfall
 
+-- Get a cell image, they are memoised, basically only computed once for each possible value of VisualState
 getCellImage :: VisualState -> UI UI.Element
 getCellImage s = fromJust (Map.lookup s images) -- This should never throw
 
--- Cache the images
+-- Memoise the images
 images :: Map.Map VisualState (UI UI.Element)
 images =
   Map.fromList $
@@ -106,10 +113,7 @@ imageFileName (SurroundingMines n) = "number" ++ show n
 imageFileName Flagged = "flag"
 imageFileName Exploded = "exploded"
 
-modeImageClassName = "modeImage"
-
-boardId = "board"
-
+-- Class names used for identifying and deleting board elements
 cellClassName = "cell"
 
 rowClassName = "row"
@@ -120,10 +124,11 @@ deleteAllBoardElements window = do
   mapM_ UI.delete =<< UI.getElementsByClassName window cellClassName
   mapM_ UI.delete =<< UI.getElementsByClassName window rowClassName
 
+-- Get memoised mode image
 getModeImage :: Mode -> UI UI.Element
 getModeImage m = fromJust (Map.lookup m modeImages) -- This should never throw
 
--- Cache mode images
+-- Memoise mode images
 modeImages :: Map.Map Mode (UI UI.Element)
 modeImages = Map.fromList [(x, buildModeImage x) | x <- [minBound :: Mode .. maxBound]]
 
@@ -131,7 +136,6 @@ modeImages = Map.fromList [(x, buildModeImage x) | x <- [minBound :: Mode .. max
 buildModeImage :: Mode -> UI UI.Element
 buildModeImage m =
   UI.img
-    # set UI.class_ modeImageClassName
     # set style [("width", "100%"), ("height", "100%"), ("margin", "0px"), ("padding", "0px"), ("display", "block")]
     # set UI.src (getModeImageName m)
 
@@ -174,13 +178,14 @@ mainPageButtonStyles =
     ("border-radius", "5px")
   ]
 
--- Function used for remove all contenct from the page
-resetAllChildren window = getBody window # set children []
+-- Function used for removing all content from the page
+resetAllChildren :: Window -> UI UI.Element
+resetAllChildren = set children [] . getBody
 
 -- Landing page to select your difficulty
 setup :: Window -> UI ()
 setup window = do
-  resetAllChildren window
+  resetAllChildren window -- Reset the window, remove any elements that might still be there
   getBody window # set style [("background-image", "url('https://www.newegg.com/insider/wp-content/uploads/2014/04/windows_xp_bliss-wide.jpg')")] -- Windows background
   return window # set title "Minesweeper"
 
@@ -189,17 +194,21 @@ setup window = do
   mediumBtn <- UI.button #+ [string "Medium"] # set style (("margin-bottom", "40px") : mainPageButtonStyles)
   hardBtn <- UI.button #+ [string "Hard"] # set style mainPageButtonStyles
 
-  let homePage =
+  let buttons = [easyBtn, mediumBtn, hardBtn]
+      homePage =
         [ element pageTitle,
           UI.div
             # set style [("position", "absolute"), ("left", "50%"), ("top", "50%"), ("transform", "translate(-50%, -50%)")]
             #+ [ UI.div
                    # set style [("display", "flex"), ("flexDirection", "column"), ("justifyContent", "space-around")]
-                   #+ [element easyBtn, element mediumBtn, element hardBtn] -- Evenly space buttons in this div
+                   #+ map element buttons -- Evenly space buttons in this div
                ]
         ]
 
-  let deleteHomePage () = mapM_ UI.delete [pageTitle, easyBtn, mediumBtn, hardBtn]
+  let deleteHomePage () = do
+        mapM_ UI.delete buttons
+        homePageElements <- sequence homePage
+        mapM_ UI.delete homePageElements
 
   getBody window #+ homePage
 
@@ -219,16 +228,16 @@ setup window = do
 -- Play the actual minesweeper game
 playMinesweeper :: Int -> Int -> Window -> UI ()
 playMinesweeper size numOfMines window = do
-  resetAllChildren window
+  resetAllChildren window -- Reset the window, remove any elements that might still be there
   runFunction $ ffi "document.addEventListener('contextmenu', function(event) {event.preventDefault();});" -- Disable the context menu popup on right clicks
 
   -- Create a mutable reference to the board
   boardRef <- liftIO $ newIORef =<< generateBoard size numOfMines
-  board <- liftIO $ readIORef boardRef
 
   -- Create a mutable reference to the current mode
   modeRef <- liftIO $ newIORef Mining
 
+  -- End text banner, to be shown when the game ends
   endText <- UI.div
   let setTextAndStyles s styles =
         element endText
@@ -248,41 +257,42 @@ playMinesweeper size numOfMines window = do
         prevBoard <- liftIO $ readIORef boardRef
         -- Update the board state by running the update action
         when (state prevBoard == Playing) $ do
-          let updatedBoard = action prevBoard indices
+          let newBoard = action prevBoard indices
           -- Write the updated state back to the IORef
-          liftIO $ writeIORef boardRef updatedBoard
+          liftIO $ writeIORef boardRef newBoard
 
-          -- Only change the differences
-          let changeFunc = if state updatedBoard /= Playing then changeDiffsWaterfall else changeDiffs
-          changeFunc window (getBoardVisuals prevBoard) (getBoardVisuals updatedBoard)
+          -- Only change the differences, if it's the end of the game then use the waterfall effect
+          let changeFunc = if state newBoard /= Playing then changeDiffsWaterfall else changeDiffs
+          changeFunc window (getBoardVisuals prevBoard) (getBoardVisuals newBoard)
 
-          showEndGameBanner $ state updatedBoard
+          showEndGameBanner $ state newBoard
 
   -- Button to start a new game in the current difficulty
   refreshButton <-
     UI.button
-      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      # set style minesweeperUtilityButtonStyles
       #+ [refreshImage]
 
   -- Return to the home screen (setup function)
   homeButton <-
     UI.button
-      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      # set style minesweeperUtilityButtonStyles
       #+ [homeImage]
 
   -- Button to get the AI to play a move
   autoMoveButton <-
     UI.button
-      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      # set style minesweeperUtilityButtonStyles
       #+ [autoMoveImage]
 
   -- Button to display and change the current mode, mining or flagging
   modeButton <- do
     mode <- liftIO $ readIORef modeRef
     UI.button
-      # set style [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
+      # set style minesweeperUtilityButtonStyles
       #+ [getModeImage mode]
 
+  board <- liftIO $ readIORef boardRef
   -- Element representing the minesweeper board, as a table of buttons
   boardElement <- mkTable revealAndUpdateBoard modeRef $ grid $ getBoardVisuals board
 
@@ -301,36 +311,41 @@ playMinesweeper size numOfMines window = do
   let deleteMinesweeperPage () = do
         deleteAllBoardElements window
         mapM_ UI.delete [modeButton, homeButton, refreshButton, autoMoveButton, boardElement, endText]
-        minesweeperPageElements <- liftIO $ mapM (runUI window) minesweeperPage
+        minesweeperPageElements <- sequence minesweeperPage
         mapM_ UI.delete minesweeperPageElements
   getBody window #+ minesweeperPage
 
-  -- Click handlers
+  -- Mode button handler
   on UI.click modeButton $ \_ -> do
-    liftIO $ modifyIORef modeRef (\s -> if s == Flagging then Mining else Flagging)
+    liftIO $ modifyIORef modeRef (\s -> if s == Flagging then Mining else Flagging) -- Flip the mode
     mode <- liftIO $ readIORef modeRef
-    modeImg <- getModeImage mode
-    element modeButton # set children [modeImg]
+    modeImg <- getModeImage mode -- Get the mode image
+    element modeButton # set children [modeImg] -- Set the new mode image
 
-  on UI.click homeButton $ \_ -> do
-    deleteMinesweeperPage ()
-    setup window
+  -- Home button handler
+  on UI.click homeButton $ \_ -> deleteMinesweeperPage () >> setup window -- Delete the current page and go back to the home page
+
+  -- Refresh button handler
   on UI.click refreshButton $ \_ -> do
-    prev <- liftIO $ readIORef boardRef
-    new <- liftIO $ generateBoard size numOfMines
-    liftIO $ writeIORef boardRef new
-    setTextAndStyles "" []
-    changeDiffsWaterfall window (getBoardVisuals prev) (getBoardVisuals new)
+    prev <- liftIO $ readIORef boardRef -- Get previous board
+    new <- liftIO $ generateBoard size numOfMines -- Get new board
+    liftIO $ writeIORef boardRef new -- Write new board
+    setTextAndStyles "" [] -- Remove the end text if it's there
+    changeDiffsWaterfall window (getBoardVisuals prev) (getBoardVisuals new) -- Change all the necessary cells, with a waterfall effect
 
+  -- Auto move button handler
   on UI.click autoMoveButton $ \_ -> do
     currentBoard <- liftIO $ readIORef boardRef
-    when (state currentBoard == Playing) $ do
+    when (state currentBoard == Playing) $ do -- Only make a move if the game isn't over
       case makeMove $ getBoardVisuals currentBoard of
         Just (Uncover ind) -> revealAndUpdateBoard ind revealCell
         Just (Flag ind) -> revealAndUpdateBoard ind toggleFlag
-        Nothing -> do
+        Nothing -> do -- If we couldn't find an obvious move, make a random move
           x <- liftIO $ uncoverRandom $ getBoardVisuals currentBoard
           revealAndUpdateBoard x revealCell
+
+-- Common minesweeper page button styles
+minesweeperUtilityButtonStyles = [("width", "50px"), ("height", "50px"), ("margin", "0px"), ("padding", "0px")]
 
 -- A styling to have text be in the sort of "You Died" dark souls death style, even if you win...
 darkSoulsDeathStyle =
@@ -376,6 +391,5 @@ mkRow actionOnClick modeRef cols =
 mkTable :: ((Int, Int) -> (Board -> (Int, Int) -> Board) -> UI void) -> IORef Mode -> [[((Int, Int), VisualState)]] -> UI UI.Element
 mkTable actionOnClick modeRef rows =
   UI.table
-    # set UI.id_ "board"
     # set style [("width", "100%"), ("height", "100%"), ("border-spacing", "0px"), ("border-collapse", "collapse"), ("cellspacing", "0px"), ("margin", "0px"), ("padding", "0px"), ("border", "1px solid black")]
     #+ map (mkRow actionOnClick modeRef) rows
