@@ -11,13 +11,14 @@ module Board
     revealCell,
     getBoardVisuals,
     generateSeededBoard,
-    generateBoard
+    generateBoard,
   )
 where
 
 import Control.Monad.Random
   ( MonadRandom (getRandomRs),
     Random (randomRs),
+    getStdGen,
   )
 import Data.List (foldl', groupBy, nub)
 import Data.Maybe (fromJust, isJust)
@@ -164,16 +165,24 @@ generateBoard size numBombs = do
           Cell {hasMine = (i * size + j) `elem` randomIndices, status = Unrevealed}
   pure $ Board Playing grid numBombs
 
+-- Try to find an index without a mine
+tryFindIndexWithNoMine :: Board -> Maybe (Int, Int)
+tryFindIndexWithNoMine b@Board {grid = g} = do
+  i <- V.findIndex (V.any (not . hasMine)) g
+  j <- V.findIndex (not . hasMine) (g V.! i)
+  pure (i, j)
+
+-- Set cell at a particular index to a new value
+setCellAtIndex :: Board -> ((Int, Int), Cell) -> Board
+setCellAtIndex b@Board {grid = g} ((i, j), newCell) =
+  b {grid = g V.// [(i, (g V.! i) V.// [(j, newCell)])]}
+
 -- Update a cell status and return the new grid containing the new cell
 updateCellStatus :: (Cell -> CellState) -> Board -> (Int, Int) -> Board
-updateCellStatus getNewState b@Board {grid = g} (i, j) =
-  b {grid = newGrid}
+updateCellStatus getNewState b ind =
+  setCellAtIndex b (ind, (oldCell {status = getNewState oldCell}))
   where
-    oldRow = g V.! i
-    oldCell = oldRow V.! j
-    newCell = oldCell {status = getNewState oldCell}
-    newRow = V.update oldRow (V.singleton (j, newCell))
-    newGrid = V.update g (V.singleton (i, newRow))
+    oldCell = getCellAtIndexUnsafe b ind
 
 -- Users call this to reveal a cell
 revealCell :: Board -> (Int, Int) -> Board
@@ -221,15 +230,3 @@ toggleFlagHelper =
         Flagged_ -> Unrevealed
         x -> x
     )
-
--- Try to find an index without a mine
-tryFindIndexWithNoMine :: Board -> Maybe (Int, Int)
-tryFindIndexWithNoMine b@Board {grid = g} = do
-  i <- V.findIndex (V.any (not . hasMine)) g
-  j <- V.findIndex (not . hasMine) (g V.! i)
-  pure (i, j)
-
--- Set cell at a particular index to a new value
-setCellAtIndex :: Board -> ((Int, Int), Cell) -> Board
-setCellAtIndex b@Board {grid = g} ((i, j), newCell) =
-  b {grid = g V.// [(i, (g V.! i) V.// [(j, newCell)])]}
