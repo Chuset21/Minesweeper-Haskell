@@ -89,23 +89,22 @@ getBoardVisuals b@Board {state = s, totalMines = m} =
 cellToVisualState :: Board -> ((Int, Int), Cell) -> VisualState
 cellToVisualState b@Board {state = s} (indices, cell) =
   case (s, status cell) of
-    (Playing, Unrevealed) -> Covered
-    (Playing, Revealed) -> getRevealedValue
-    (Playing, Flagged_) -> Flagged
+    (Playing, st) -> cellStateToVisualState st
     (Won, st) -> case st of
       Revealed -> getRevealedValue
       _ -> Flagged
     (Lost, st) ->
       if hasMine cell
         then Exploded
-        else case st of
-          Revealed -> getRevealedValue
-          Unrevealed -> Covered
-          Flagged_ -> Flagged
+        else cellStateToVisualState st
   where
     getRevealedValue =
       let n = countSurroundingMines b indices
        in if n > 0 then SurroundingMines n else Uncovered
+    cellStateToVisualState = \case
+      Revealed -> getRevealedValue
+      Unrevealed -> Covered
+      Flagged_ -> Flagged
 
 -- Get a list of indexed cells that satisfy a condition
 getIf :: Board -> (Cell -> Bool) -> [((Int, Int), Cell)]
