@@ -11,15 +11,18 @@ module Board
     revealCell,
     getBoardVisuals,
     generateSeededBoard,
-    generateBoard,
+    generateBoard
   )
 where
 
 import Control.Monad.Random
-    ( Random(randomRs), MonadRandom(getRandomRs) )
-import Data.List ( foldl', groupBy, nub )
+  ( MonadRandom (getRandomRs),
+    Random (randomRs),
+  )
+import Data.List (foldl', groupBy, nub)
+import Data.Maybe (fromJust, isJust)
 import qualified Data.Vector as V
-import System.Random ( Random(randomRs), RandomGen(split) )
+import System.Random (Random (randomRs), RandomGen (split))
 
 -- Board state
 data BoardState = Lost | Playing | Won deriving (Eq, Show)
@@ -186,16 +189,25 @@ revealNecessaryCells b i =
 
 -- This should not be called if the cell is already revealed or flagged, it assumes it is unrevealed and that the game state is Playing
 revealCellHelper :: Board -> (Int, Int) -> Board
-revealCellHelper b@Board {state = s, totalMines = mines} i =
-  newBoard {state = newBoardState}
+revealCellHelper b@Board {state = s, totalMines = mines} ind =
+  -- If it is the first move then it must be safe
+  if isMine && isFirstMove && isJust maybeIndexWithNoMine -- If first two conditions are met but no cell with no mine was found then they are all mines...
+    then
+      let indexWithNoMine = fromJust maybeIndexWithNoMine -- Find index with no mine
+          boardWithMineAtIndex = setCellAtIndex b (indexWithNoMine, Cell {hasMine = True, status = Unrevealed}) -- Put a mine at the index without a mine
+          newBoard = setCellAtIndex boardWithMineAtIndex (ind, Cell {hasMine = False, status = Unrevealed}) -- Remove the mine at the current index
+       in revealCellHelper newBoard ind -- Play the move with new board
+    else
+      let newBoard = revealNecessaryCells b ind
+          newBoardState
+            | hasMine $ getCellAtIndexUnsafe b ind = Lost
+            | (size b * size b - mines) <= length (getIf newBoard (\c -> status c == Revealed)) = Won
+            | otherwise = s
+       in newBoard {state = newBoardState}
   where
-    newBoard = revealNecessaryCells b i
-
-    totalNumberOfCells = size b * size b
-    newBoardState
-      | hasMine $ getCellAtIndexUnsafe b i = Lost
-      | (totalNumberOfCells - mines) <= length (getIf newBoard (\c -> status c == Revealed)) = Won
-      | otherwise = s
+    isFirstMove = size b * size b == length (getIf b (\c -> status c == Unrevealed))
+    isMine = hasMine $ getCellAtIndexUnsafe b ind
+    maybeIndexWithNoMine = tryFindIndexWithNoMine b
 
 -- Users call this to toggle a covered square from being flagged or not
 toggleFlag :: Board -> (Int, Int) -> Board
@@ -209,3 +221,15 @@ toggleFlagHelper =
         Flagged_ -> Unrevealed
         x -> x
     )
+
+-- Try to find an index without a mine
+tryFindIndexWithNoMine :: Board -> Maybe (Int, Int)
+tryFindIndexWithNoMine b@Board {grid = g} = do
+  i <- V.findIndex (V.any (not . hasMine)) g
+  j <- V.findIndex (not . hasMine) (g V.! i)
+  return (i, j)
+
+-- Set cell at a particular index to a new value
+setCellAtIndex :: Board -> ((Int, Int), Cell) -> Board
+setCellAtIndex b@Board {grid = g} ((i, j), newCell) =
+  b {grid = g V.// [(i, (g V.! i) V.// [(j, newCell)])]}
